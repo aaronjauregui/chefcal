@@ -83,6 +83,13 @@ Or run directly:
 go run . -config config.yaml
 ```
 
+### Docker
+
+```bash
+docker build -t chefcal .
+docker run -p 8080:8080 -v ./config.yaml:/config.yaml -v ./data:/data chefcal
+```
+
 ### Configuration
 
 Copy `config.yaml.example` and edit it:
