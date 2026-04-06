@@ -1,0 +1,20 @@
+# ChefCal configuration
+server:
+  address: ":8080"
+
+nextcloud:
+  url: "https://your-nextcloud.example.com/remote.php/dav/files/username"
+  username: "your-username"
+  password: "your-password"
+  meal_plans_path: "/Meal Plans"
+  recipes_path: "/Recipes"
+  insecure_skip_verify: false  # set to true for self-signed certificates
+
+planner:
+  dinner_done_by: "18:30"
+  shopping_event_time: "12:00"
+  shopping_event_day: "Saturday"
+  timezone: "Australia/Sydney"
+
+store:
+  path: "data/weeks.json"
