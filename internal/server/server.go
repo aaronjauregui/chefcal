@@ -9,20 +9,19 @@ import (
 
 	"github.com/aaronjauregui/chefcal/internal/ical"
 	"github.com/aaronjauregui/chefcal/internal/model"
-	"github.com/aaronjauregui/chefcal/internal/nextcloud"
 	"github.com/aaronjauregui/chefcal/internal/planner"
 	"github.com/aaronjauregui/chefcal/internal/store"
 )
 
 type Server struct {
-	nc      *nextcloud.Client
+	nc      model.RecipeSource
 	planner *planner.Planner
 	ical    *ical.Generator
 	store   *store.Store
 	mux     *http.ServeMux
 }
 
-func New(nc *nextcloud.Client, p *planner.Planner, ig *ical.Generator, s *store.Store) *Server {
+func New(nc model.RecipeSource, p *planner.Planner, ig *ical.Generator, s *store.Store) *Server {
 	srv := &Server{
 		nc:      nc,
 		planner: p,
@@ -62,7 +61,7 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	weekStart := planner.NextWeekStart(time.Now(), s.planner.Location())
-	if s.store.HasWeek(weekStart) {
+	for s.store.HasWeek(weekStart) {
 		weekStart = weekStart.AddDate(0, 0, 7)
 	}
 

@@ -1,6 +1,15 @@
 package model
 
-import "time"
+import (
+	"time"
+)
+
+// RecipeSource abstracts access to meal plans and recipes.
+type RecipeSource interface {
+	ListMealPlans() ([]string, error)
+	ReadMealPlan(name string) (*MealPlan, error)
+	ReadRecipe(name string) (*Recipe, error)
+}
 
 type Recipe struct {
 	ID                 string      `json:"id"`
@@ -30,8 +39,8 @@ type DayMeal struct {
 }
 
 type WeekPlan struct {
-	WeekStart    time.Time `json:"week_start"` // Monday
+	WeekStart    time.Time `json:"week_start"` // Saturday
 	MealPlanName string    `json:"meal_plan_name"`
-	Days         []DayMeal `json:"days"`       // 7 days, Mon-Sun
+	Days         []DayMeal `json:"days"`       // 7 days, Sat-Fri
 	GeneratedAt  time.Time `json:"generated_at"`
 }

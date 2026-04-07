@@ -12,15 +12,17 @@ import (
 )
 
 type Store struct {
-	path  string
-	mu    sync.RWMutex
-	weeks map[string]*model.WeekPlan // key: week start date "2006-01-02"
+	path     string
+	location *time.Location
+	mu       sync.RWMutex
+	weeks    map[string]*model.WeekPlan // key: week start date "2006-01-02"
 }
 
-func New(path string) (*Store, error) {
+func New(path string, location *time.Location) (*Store, error) {
 	s := &Store{
-		path:  path,
-		weeks: make(map[string]*model.WeekPlan),
+		path:     path,
+		location: location,
+		weeks:    make(map[string]*model.WeekPlan),
 	}
 
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -56,7 +58,8 @@ func (s *Store) GetCurrentWeeks() []*model.WeekPlan {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	today := time.Now().Truncate(24 * time.Hour)
+	now := time.Now().In(s.location)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, s.location)
 	var result []*model.WeekPlan
 	for _, w := range s.weeks {
 		weekEnd := w.WeekStart.AddDate(0, 0, 6)
@@ -77,7 +80,8 @@ func (s *Store) HasWeek(weekStart time.Time) bool {
 
 // cleanup removes weeks that have fully passed.
 func (s *Store) cleanup() {
-	today := time.Now().Truncate(24 * time.Hour)
+	now := time.Now().In(s.location)
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, s.location)
 	for key, w := range s.weeks {
 		weekEnd := w.WeekStart.AddDate(0, 0, 6)
 		if weekEnd.Before(today) {
@@ -86,10 +90,32 @@ func (s *Store) cleanup() {
 	}
 }
 
+// persist writes the store to disk atomically via temp file + rename.
 func (s *Store) persist() error {
 	data, err := json.MarshalIndent(s.weeks, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshaling store: %w", err)
 	}
-	return os.WriteFile(s.path, data, 0o644)
+
+	dir := filepath.Dir(s.path)
+	tmp, err := os.CreateTemp(dir, "weeks-*.json.tmp")
+	if err != nil {
+		return fmt.Errorf("creating temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("writing temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("closing temp file: %w", err)
+	}
+	if err := os.Rename(tmpPath, s.path); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("renaming temp file: %w", err)
+	}
+	return nil
 }

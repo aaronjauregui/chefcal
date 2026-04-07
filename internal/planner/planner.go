@@ -9,11 +9,10 @@ import (
 	"time"
 
 	"github.com/aaronjauregui/chefcal/internal/model"
-	"github.com/aaronjauregui/chefcal/internal/nextcloud"
 )
 
 type Planner struct {
-	nc           *nextcloud.Client
+	nc           model.RecipeSource
 	dinnerDoneBy TimeOfDay
 	location     *time.Location
 }
@@ -31,7 +30,7 @@ func ParseTimeOfDay(s string) (TimeOfDay, error) {
 	return TimeOfDay{Hour: t.Hour(), Minute: t.Minute()}, nil
 }
 
-func NewPlanner(nc *nextcloud.Client, dinnerDoneBy string, timezone string) (*Planner, error) {
+func NewPlanner(nc model.RecipeSource, dinnerDoneBy string, timezone string) (*Planner, error) {
 	tod, err := ParseTimeOfDay(dinnerDoneBy)
 	if err != nil {
 		return nil, err
@@ -59,23 +58,28 @@ func (p *Planner) GenerateWeek(weekStart time.Time, planName string) (*model.Wee
 		GeneratedAt:  time.Now(),
 	}
 
-	// Filter to only recipes that exist in Nextcloud
-	var available []string
+	// Fetch and cache all valid recipes
+	recipeCache := make(map[string]*model.Recipe)
 	for _, name := range plan.Recipes {
-		if _, err := p.nc.ReadRecipe(name); err != nil {
+		recipe, err := p.nc.ReadRecipe(name)
+		if err != nil {
 			log.Printf("Skipping recipe %q: %v", name, err)
 			continue
 		}
-		available = append(available, name)
+		recipeCache[name] = recipe
 	}
-	if len(available) == 0 {
+	if len(recipeCache) == 0 {
 		return nil, fmt.Errorf("no valid recipes found in meal plan %q", planName)
 	}
-	if len(available) < 7 {
-		return nil, fmt.Errorf("meal plan %q has only %d valid recipes, need at least 7", planName, len(available))
+	if len(recipeCache) < 7 {
+		return nil, fmt.Errorf("meal plan %q has only %d valid recipes, need at least 7", planName, len(recipeCache))
 	}
 
 	// Shuffle and pick 7 unique recipes
+	available := make([]string, 0, len(recipeCache))
+	for name := range recipeCache {
+		available = append(available, name)
+	}
 	rand.Shuffle(len(available), func(i, j int) { available[i], available[j] = available[j], available[i] })
 	picked := available[:7]
 
@@ -83,12 +87,10 @@ func (p *Planner) GenerateWeek(weekStart time.Time, planName string) (*model.Wee
 		date := weekStart.AddDate(0, 0, i)
 		recipeName := picked[i]
 
-		recipe, _ := p.nc.ReadRecipe(recipeName)
-
 		week.Days = append(week.Days, model.DayMeal{
 			Date:       date,
 			RecipeName: recipeName,
-			Recipe:     *recipe,
+			Recipe:     *recipeCache[recipeName],
 		})
 	}
 
@@ -130,7 +132,7 @@ func NextWeekStart(from time.Time, loc *time.Location) time.Time {
 	return from.AddDate(0, 0, daysUntilSaturday)
 }
 
-var iso8601Re = regexp.MustCompile(`PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?`)
+var iso8601Re = regexp.MustCompile(`P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?`)
 
 func ParseISO8601Duration(s string) time.Duration {
 	matches := iso8601Re.FindStringSubmatch(s)
@@ -140,15 +142,19 @@ func ParseISO8601Duration(s string) time.Duration {
 
 	var d time.Duration
 	if matches[1] != "" {
-		h, _ := strconv.Atoi(matches[1])
-		d += time.Duration(h) * time.Hour
+		days, _ := strconv.Atoi(matches[1])
+		d += time.Duration(days) * 24 * time.Hour
 	}
 	if matches[2] != "" {
-		m, _ := strconv.Atoi(matches[2])
-		d += time.Duration(m) * time.Minute
+		h, _ := strconv.Atoi(matches[2])
+		d += time.Duration(h) * time.Hour
 	}
 	if matches[3] != "" {
-		sec, _ := strconv.Atoi(matches[3])
+		m, _ := strconv.Atoi(matches[3])
+		d += time.Duration(m) * time.Minute
+	}
+	if matches[4] != "" {
+		sec, _ := strconv.Atoi(matches[4])
 		d += time.Duration(sec) * time.Second
 	}
 	return d
