@@ -42,7 +42,7 @@ func main() {
 		log.Fatalf("Failed to create ical generator: %v", err)
 	}
 
-	st, err := store.New(cfg.Store.Path)
+	st, err := store.New(cfg.Store.Path, p.Location())
 	if err != nil {
 		log.Fatalf("Failed to create store: %v", err)
 	}

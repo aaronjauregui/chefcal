@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/aaronjauregui/chefcal/internal/model"
 	"github.com/aaronjauregui/chefcal/internal/planner"
 )
 
 type Generator struct {
-	planner             *planner.Planner
-	shoppingEventTime   planner.TimeOfDay
-	shoppingEventDay    time.Weekday
+	planner           *planner.Planner
+	shoppingEventTime planner.TimeOfDay
+	shoppingEventDay  time.Weekday
 }
 
 func NewGenerator(p *planner.Planner, shoppingTime string, shoppingDay string) (*Generator, error) {
@@ -46,7 +47,7 @@ func (g *Generator) Generate(weeks []*model.WeekPlan) string {
 
 	for _, week := range weeks {
 		for _, day := range week.Days {
-			g.writeDinnerEvent(&b, &day)
+			g.writeDinnerEvent(&b, &day, week.GeneratedAt)
 		}
 		g.writeShoppingEvent(&b, week)
 	}
@@ -55,16 +56,17 @@ func (g *Generator) Generate(weeks []*model.WeekPlan) string {
 	return b.String()
 }
 
-func (g *Generator) writeDinnerEvent(b *strings.Builder, day *model.DayMeal) {
+func (g *Generator) writeDinnerEvent(b *strings.Builder, day *model.DayMeal, generatedAt time.Time) {
 	end := g.planner.DinnerEndTime(day.Date)
 	start := g.planner.DinnerStartTime(day.Date, &day.Recipe)
-	uid := eventUID("dinner", day.Date)
+	uid := eventUID("dinner", day.Date, generatedAt)
+	tzName := g.planner.Location().String()
 
 	b.WriteString("BEGIN:VEVENT\r\n")
 	writeField(b, "UID", uid)
-	writeField(b, "DTSTAMP", formatDateTime(time.Now()))
-	writeField(b, "DTSTART", formatDateTime(start))
-	writeField(b, "DTEND", formatDateTime(end))
+	writeField(b, "DTSTAMP", formatDateTimeUTC(time.Now()))
+	writeField(b, fmt.Sprintf("DTSTART;TZID=%s", tzName), formatDateTimeLocal(start))
+	writeField(b, fmt.Sprintf("DTEND;TZID=%s", tzName), formatDateTimeLocal(end))
 	writeField(b, "SUMMARY", fmt.Sprintf("Dinner: %s", day.RecipeName))
 
 	var desc strings.Builder
@@ -90,11 +92,12 @@ func (g *Generator) writeDinnerEvent(b *strings.Builder, day *model.DayMeal) {
 }
 
 func (g *Generator) writeShoppingEvent(b *strings.Builder, week *model.WeekPlan) {
-	satDate := g.findDay(week.WeekStart, g.shoppingEventDay)
-	start := time.Date(satDate.Year(), satDate.Month(), satDate.Day(),
+	shoppingDate := g.findDay(week.WeekStart, g.shoppingEventDay)
+	start := time.Date(shoppingDate.Year(), shoppingDate.Month(), shoppingDate.Day(),
 		g.shoppingEventTime.Hour, g.shoppingEventTime.Minute, 0, 0, g.planner.Location())
 	end := start.Add(1 * time.Hour)
-	uid := eventUID("shopping", week.WeekStart)
+	uid := eventUID("shopping", week.WeekStart, week.GeneratedAt)
+	tzName := g.planner.Location().String()
 
 	var desc strings.Builder
 	desc.WriteString(fmt.Sprintf("Shopping list for week of %s\\n", week.WeekStart.Format("Jan 2")))
@@ -111,39 +114,50 @@ func (g *Generator) writeShoppingEvent(b *strings.Builder, week *model.WeekPlan)
 
 	b.WriteString("BEGIN:VEVENT\r\n")
 	writeField(b, "UID", uid)
-	writeField(b, "DTSTAMP", formatDateTime(time.Now()))
-	writeField(b, "DTSTART", formatDateTime(start))
-	writeField(b, "DTEND", formatDateTime(end))
+	writeField(b, "DTSTAMP", formatDateTimeUTC(time.Now()))
+	writeField(b, fmt.Sprintf("DTSTART;TZID=%s", tzName), formatDateTimeLocal(start))
+	writeField(b, fmt.Sprintf("DTEND;TZID=%s", tzName), formatDateTimeLocal(end))
 	writeField(b, "SUMMARY", fmt.Sprintf("Shopping List - %s", week.MealPlanName))
 	writeField(b, "DESCRIPTION", desc.String())
 	b.WriteString("END:VEVENT\r\n")
 }
 
+// findDay returns the date for the given weekday within the 7-day span
+// starting at weekStart.
 func (g *Generator) findDay(weekStart time.Time, day time.Weekday) time.Time {
-	// weekStart is Monday (Weekday == 1)
-	offset := int(day) - int(time.Monday)
-	if offset < 0 {
-		offset += 7
-	}
+	offset := (int(day) - int(weekStart.Weekday()) + 7) % 7
 	return weekStart.AddDate(0, 0, offset)
 }
 
-func formatDateTime(t time.Time) string {
+func formatDateTimeUTC(t time.Time) string {
+	return t.UTC().Format("20060102T150405Z")
+}
+
+func formatDateTimeLocal(t time.Time) string {
 	return t.Format("20060102T150405")
 }
 
-func eventUID(prefix string, date time.Time) string {
-	h := sha256.Sum256([]byte(fmt.Sprintf("%s-%s", prefix, date.Format("2006-01-02"))))
+func eventUID(prefix string, date time.Time, generatedAt time.Time) string {
+	h := sha256.Sum256([]byte(fmt.Sprintf("%s-%s-%s", prefix, date.Format("2006-01-02"), generatedAt.Format(time.RFC3339Nano))))
 	return fmt.Sprintf("%x@chefcal", h[:8])
 }
 
+// writeField writes an iCal property with RFC 5545 line folding.
+// Folds at 75 octets, respecting UTF-8 character boundaries.
 func writeField(b *strings.Builder, key, value string) {
 	line := fmt.Sprintf("%s:%s", key, value)
-	// iCal line folding: max 75 octets per line
 	for len(line) > 75 {
-		b.WriteString(line[:75])
+		cut := 75
+		// Walk back to a valid UTF-8 boundary
+		for cut > 0 && !utf8.RuneStart(line[cut]) {
+			cut--
+		}
+		if cut == 0 {
+			cut = 75 // shouldn't happen with valid UTF-8, but avoid infinite loop
+		}
+		b.WriteString(line[:cut])
 		b.WriteString("\r\n ")
-		line = line[75:]
+		line = line[cut:]
 	}
 	b.WriteString(line)
 	b.WriteString("\r\n")

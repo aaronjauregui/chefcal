@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"html"
 	"strings"
 
 	"github.com/aaronjauregui/chefcal/internal/model"
@@ -39,7 +40,7 @@ func renderIndex(weeks []*model.WeekPlan, plans []string, host string) string {
 `)
 
 	// Calendar subscription URL
-	calURL := fmt.Sprintf("http://%s/calendar.ics", host)
+	calURL := fmt.Sprintf("http://%s/calendar.ics", html.EscapeString(host))
 	b.WriteString(fmt.Sprintf(`<h2>Calendar Feed</h2>
 <div class="card">
 <p>Subscribe to this URL in Nextcloud:</p>
@@ -55,7 +56,8 @@ func renderIndex(weeks []*model.WeekPlan, plans []string, host string) string {
 <option value="">Random plan</option>
 `)
 	for _, p := range plans {
-		b.WriteString(fmt.Sprintf(`<option value="%s">%s</option>`+"\n", p, p))
+		escaped := html.EscapeString(p)
+		b.WriteString(fmt.Sprintf(`<option value="%s">%s</option>`+"\n", escaped, escaped))
 	}
 	b.WriteString(`</select>
 <button type="submit">Generate Next Week</button>
@@ -70,10 +72,10 @@ func renderIndex(weeks []*model.WeekPlan, plans []string, host string) string {
 		for _, week := range weeks {
 			b.WriteString(fmt.Sprintf(`<div class="card">
 <strong>Week of %s</strong> (plan: %s)
-`, week.WeekStart.Format("Jan 2, 2006"), week.MealPlanName))
+`, week.WeekStart.Format("Jan 2, 2006"), html.EscapeString(week.MealPlanName)))
 			for _, day := range week.Days {
 				b.WriteString(fmt.Sprintf(`<div class="day"><span class="day-name">%s</span><span>%s</span></div>
-`, day.Date.Format("Monday"), day.RecipeName))
+`, day.Date.Format("Monday"), html.EscapeString(day.RecipeName)))
 			}
 			b.WriteString("</div>\n")
 		}
