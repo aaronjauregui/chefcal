@@ -13,7 +13,7 @@ A Go web service that generates weekly meal plans from recipes stored in Nextclo
 
 ## Nextcloud Directory Structure
 
-ChefCal expects the following layout in your Nextcloud files:
+ChefCal uses the default layout from the [official Cookbook app](https://github.com/nextcloud/cookbook/). Thus, ChefCal expects the following layout in your Nextcloud files:
 
 ```
 /Meal Plans/
