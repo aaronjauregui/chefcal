@@ -1,2 +1,5 @@
 data
 config.yaml
+
+# build artifact
+/chefcal

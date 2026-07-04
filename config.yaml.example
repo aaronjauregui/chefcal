@@ -9,6 +9,10 @@ nextcloud:
   meal_plans_path: "/Meal Plans"
   recipes_path: "/Recipes"
   insecure_skip_verify: false  # set to true for self-signed certificates
+  # Required only for the push model (`chefcal -push`). CalDAV collection URL
+  # for a calendar ChefCal owns; it will be created on first push if missing.
+  calendar_url: "https://your-nextcloud.example.com/remote.php/dav/calendars/username/chefcal"
+  calendar_display_name: "Meal Plan"
 
 planner:
   dinner_done_by: "18:30"

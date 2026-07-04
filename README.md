@@ -11,6 +11,11 @@ A Go web service that generates weekly meal plans from recipes stored in Nextclo
 5. A shopping list event is created on Saturday at noon (configurable) containing all aggregated ingredients for the week
 6. The calendar is served as a standard `.ics` feed that any calendar app can subscribe to
 
+ChefCal supports two delivery models:
+
+- **Pull** (default): ChefCal runs as a long-lived HTTP server and Nextcloud subscribes to its `.ics` feed. See [API Endpoints](#api-endpoints).
+- **Push**: ChefCal runs as a one-shot command (ideal for cron) that authenticates to Nextcloud over CalDAV and writes events directly onto a calendar it owns. No server to keep running, no feed to expose. See [Push Mode](#push-mode).
+
 ## Nextcloud Directory Structure
 
 ChefCal expects the following layout in your Nextcloud files:
@@ -105,6 +110,9 @@ nextcloud:
   meal_plans_path: "/Meal Plans"
   recipes_path: "/Recipes"
   insecure_skip_verify: false  # set to true for self-signed certificates
+  # Push mode only (see below):
+  calendar_url: "https://your-nextcloud.example.com/remote.php/dav/calendars/username/chefcal"
+  calendar_display_name: "Meal Plan"
 
 planner:
   dinner_done_by: "18:30"
@@ -125,6 +133,8 @@ store:
 | `nextcloud.meal_plans_path` | Path to meal plan files | `/Meal Plans` |
 | `nextcloud.recipes_path` | Path to recipe directories | `/Recipes` |
 | `nextcloud.insecure_skip_verify` | Skip TLS certificate verification (for self-signed certs) | `false` |
+| `nextcloud.calendar_url` | CalDAV collection URL for push mode; created if missing | (required for `-push`) |
+| `nextcloud.calendar_display_name` | Display name used when creating the calendar | `Meal Plan` |
 | `planner.dinner_done_by` | Target time for dinner to be ready | `18:30` |
 | `planner.shopping_event_time` | Time for the shopping list event | `12:00` |
 | `planner.shopping_event_day` | Day of week for the shopping list event | `Saturday` |
@@ -177,6 +187,62 @@ The response includes the week start date, chosen plan, and daily meals:
 ```
 
 If next week already has a plan, the service automatically targets the week after.
+
+## Command-Line Flags
+
+Run with no action flags to start the HTTP server (pull mode). Passing `-generate` and/or `-push` runs those one-shot actions and exits without starting the server.
+
+| Flag | Description |
+|------|-------------|
+| `-config <path>` | Path to the configuration file (default `config.yaml`) |
+| `-generate` | Generate the next unplanned week, save it to the store, and exit |
+| `-plan <name>` | Meal plan to use with `-generate` (random if omitted) |
+| `-push` | Reconcile the stored plans onto the Nextcloud calendar and exit |
+
+`-generate` and `-push` can be combined in one invocation (generate runs first).
+
+## Push Mode
+
+Instead of exposing an `.ics` feed for Nextcloud to pull, ChefCal can authenticate over CalDAV and write events directly onto a calendar it owns. This needs no long-running server and no exposed network endpoint, so it runs well as a local cronjob.
+
+### Setup
+
+1. Set `nextcloud.calendar_url` to a CalDAV collection URL. The final path segment is the calendar ID — pick any unused value; ChefCal creates the calendar on the first push if it does not exist:
+
+   ```
+   https://your-nextcloud.example.com/remote.php/dav/calendars/<username>/chefcal
+   ```
+
+2. Use a Nextcloud **app password** for `nextcloud.password` rather than your account password. The same credentials are used for reading recipes (WebDAV) and writing events (CalDAV).
+
+Give ChefCal a **dedicated** calendar. It treats the collection as exclusively its own, so reconciliation is free to delete anything that no longer belongs.
+
+### Running
+
+```bash
+# Plan the next unplanned week (random plan), then publish to the calendar
+./chefcal -generate -push
+
+# Publish/refresh without generating a new week (e.g. after editing a plan)
+./chefcal -push
+```
+
+A typical cron setup — a new week each Saturday morning, plus a nightly reconcile so edits and retractions stay in sync:
+
+```cron
+0 6 * * SAT   cd /opt/chefcal && ./chefcal -generate -push
+0 3 * * *     cd /opt/chefcal && ./chefcal -push
+```
+
+### How reconciliation works
+
+Each `-push` makes the calendar match the current stored plans, restricted to entries dated **today or later**:
+
+- **Created / updated in place** — event UIDs and resource names are deterministic functions of `(kind, date)`, so re-pushing the same day overwrites its event rather than creating a duplicate.
+- **Deleted** — any ChefCal-owned future entry that is no longer in the plan (e.g. a retracted or regenerated week) is removed.
+- **Never touched** — entries dated before today. Past events are left in place as history.
+
+Because reconciliation compares against what is actually on the server, it is self-healing: if the local store is wiped or the calendar is hand-edited, the next push converges. The calendar — not the local store — is the source of truth for what is published.
 
 ## Data Persistence
 

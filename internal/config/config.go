@@ -19,12 +19,14 @@ type ServerConfig struct {
 }
 
 type NextcloudConfig struct {
-	URL                string `yaml:"url"`
-	Username           string `yaml:"username"`
-	Password           string `yaml:"password"`
-	MealPlansPath      string `yaml:"meal_plans_path"`
-	RecipesPath        string `yaml:"recipes_path"`
-	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	URL                 string `yaml:"url"`
+	Username            string `yaml:"username"`
+	Password            string `yaml:"password"`
+	MealPlansPath       string `yaml:"meal_plans_path"`
+	RecipesPath         string `yaml:"recipes_path"`
+	InsecureSkipVerify  bool   `yaml:"insecure_skip_verify"`
+	CalendarURL         string `yaml:"calendar_url"`          // CalDAV collection URL for -push
+	CalendarDisplayName string `yaml:"calendar_display_name"` // name used when creating the calendar
 }
 
 type PlannerConfig struct {
@@ -53,6 +55,9 @@ func Load(path string) (*Config, error) {
 			Timezone:          "Australia/Sydney",
 		},
 		Store: StoreConfig{Path: "data/weeks.json"},
+		Nextcloud: NextcloudConfig{
+			CalendarDisplayName: "Meal Plan",
+		},
 	}
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
