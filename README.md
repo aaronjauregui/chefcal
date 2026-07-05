@@ -77,6 +77,8 @@ The weekly shopping list consolidates ingredients across recipes. Each ingredien
 
 Parsing is best-effort. Anything without a recognisable quantity (`Salt to taste`, `Olive oil`) is passed through verbatim — **the list never drops an ingredient**. A per-recipe breakdown is always included below the consolidated list.
 
+**Pantry staples** — ingredients you don't buy per recipe (water, salt, soy sauce, …) can be omitted from the consolidated list via `planner.pantry_staples`. They still appear in the per-recipe breakdown, so nothing is truly lost. Matching is by normalised name: a single-word entry must be the whole ingredient name (`water` won't drop `coconut water`), while a multi-word entry matches as a contiguous phrase (`soy sauce` also drops `light soy sauce`). Unset uses a built-in default of `[water, ice]`; an explicit empty list disables exclusion.
+
 ## Getting Started
 
 ### Prerequisites

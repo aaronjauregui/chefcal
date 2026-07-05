@@ -43,7 +43,7 @@ func main() {
 		log.Fatalf("Failed to create planner: %v", err)
 	}
 
-	ig, err := ical.NewGenerator(p, cfg.Planner.ShoppingEventTime, cfg.Planner.ShoppingEventDay, cfg.Planner.MeasurementSystem)
+	ig, err := ical.NewGenerator(p, cfg.Planner.ShoppingEventTime, cfg.Planner.ShoppingEventDay, cfg.Planner.MeasurementSystem, cfg.Planner.PantryStaples)
 	if err != nil {
 		log.Fatalf("Failed to create ical generator: %v", err)
 	}

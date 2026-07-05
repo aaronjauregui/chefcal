@@ -63,7 +63,7 @@ func testWeek() *model.WeekPlan {
 
 func TestGenerate_BasicStructure(t *testing.T) {
 	p := testPlanner(t)
-	g, err := NewGenerator(p, "12:00", "Saturday", "us")
+	g, err := NewGenerator(p, "12:00", "Saturday", "us", nil)
 	if err != nil {
 		t.Fatalf("NewGenerator: %v", err)
 	}
@@ -83,7 +83,7 @@ func TestGenerate_BasicStructure(t *testing.T) {
 
 func TestGenerate_DinnerEvents(t *testing.T) {
 	p := testPlanner(t)
-	g, err := NewGenerator(p, "12:00", "Saturday", "us")
+	g, err := NewGenerator(p, "12:00", "Saturday", "us", nil)
 	if err != nil {
 		t.Fatalf("NewGenerator: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestGenerate_DinnerEvents(t *testing.T) {
 
 func TestGenerate_DinnerEndTime(t *testing.T) {
 	p := testPlanner(t)
-	g, err := NewGenerator(p, "12:00", "Saturday", "us")
+	g, err := NewGenerator(p, "12:00", "Saturday", "us", nil)
 	if err != nil {
 		t.Fatalf("NewGenerator: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestGenerate_DinnerEndTime(t *testing.T) {
 
 func TestGenerate_RecipeURL(t *testing.T) {
 	p := testPlanner(t)
-	g, err := NewGenerator(p, "12:00", "Saturday", "us")
+	g, err := NewGenerator(p, "12:00", "Saturday", "us", nil)
 	if err != nil {
 		t.Fatalf("NewGenerator: %v", err)
 	}
@@ -138,7 +138,7 @@ func TestGenerate_RecipeURL(t *testing.T) {
 
 func TestGenerate_ShoppingEvent(t *testing.T) {
 	p := testPlanner(t)
-	g, err := NewGenerator(p, "12:00", "Saturday", "us")
+	g, err := NewGenerator(p, "12:00", "Saturday", "us", nil)
 	if err != nil {
 		t.Fatalf("NewGenerator: %v", err)
 	}
@@ -161,7 +161,7 @@ func TestGenerate_ShoppingEvent(t *testing.T) {
 
 func TestGenerate_Timezone(t *testing.T) {
 	p := testPlanner(t)
-	g, err := NewGenerator(p, "12:00", "Saturday", "us")
+	g, err := NewGenerator(p, "12:00", "Saturday", "us", nil)
 	if err != nil {
 		t.Fatalf("NewGenerator: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestGenerate_Timezone(t *testing.T) {
 
 func TestGenerate_EmptyWeeks(t *testing.T) {
 	p := testPlanner(t)
-	g, err := NewGenerator(p, "12:00", "Saturday", "us")
+	g, err := NewGenerator(p, "12:00", "Saturday", "us", nil)
 	if err != nil {
 		t.Fatalf("NewGenerator: %v", err)
 	}
@@ -192,7 +192,7 @@ func TestGenerate_EmptyWeeks(t *testing.T) {
 
 func TestNewGenerator_InvalidTime(t *testing.T) {
 	p := testPlanner(t)
-	_, err := NewGenerator(p, "invalid", "Saturday", "us")
+	_, err := NewGenerator(p, "invalid", "Saturday", "us", nil)
 	if err == nil {
 		t.Error("expected error for invalid time")
 	}
@@ -200,7 +200,7 @@ func TestNewGenerator_InvalidTime(t *testing.T) {
 
 func TestNewGenerator_InvalidDay(t *testing.T) {
 	p := testPlanner(t)
-	_, err := NewGenerator(p, "12:00", "Notaday", "us")
+	_, err := NewGenerator(p, "12:00", "Notaday", "us", nil)
 	if err == nil {
 		t.Error("expected error for invalid day")
 	}

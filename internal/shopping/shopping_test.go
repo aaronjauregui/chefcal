@@ -107,7 +107,7 @@ func TestAggregate_SumsSameUnit(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"200g chicken"},
 		[]string{"300g chicken"},
-	), SystemUS)
+	), Options{System: SystemUS})
 	it, ok := find(items, "chicken")
 	if !ok {
 		t.Fatalf("chicken not found in %v", items)
@@ -125,7 +125,7 @@ func TestAggregate_ConvertsWithinDimension(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"1 lb beef"},
 		[]string{"200g beef"},
-	), SystemUS)
+	), Options{System: SystemUS})
 	it, _ := find(items, "beef")
 	if it.Line() != "654g beef" {
 		t.Errorf("Line = %q, want %q", it.Line(), "654g beef")
@@ -137,7 +137,7 @@ func TestAggregate_IncompatibleUnitsKeptSeparate(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"1 cup rice"},
 		[]string{"200g rice"},
-	), SystemUS)
+	), Options{System: SystemUS})
 	it, _ := find(items, "rice")
 	// mass bucket is formatted before volume bucket
 	if it.Line() != "200g + 1 cup rice" {
@@ -149,7 +149,7 @@ func TestAggregate_CountMerges(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"2 eggs"},
 		[]string{"1 egg"},
-	), SystemUS)
+	), Options{System: SystemUS})
 	it, ok := find(items, "eggs") // first-seen display form
 	if !ok {
 		t.Fatalf("eggs not found in %v", items)
@@ -163,7 +163,7 @@ func TestAggregate_PassthroughNeverDropped(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"Salt to taste", "200g chicken"},
 		[]string{"Salt to taste"},
-	), SystemUS)
+	), Options{System: SystemUS})
 	it, ok := find(items, "Salt to taste")
 	if !ok {
 		t.Fatalf("passthrough item lost: %v", items)
@@ -190,7 +190,7 @@ func TestAggregate_DistinctNamesNotMerged(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"200g chicken breast"},
 		[]string{"200g chicken thigh"},
-	), SystemUS)
+	), Options{System: SystemUS})
 	if _, ok := find(items, "chicken breast"); !ok {
 		t.Error("chicken breast missing")
 	}
@@ -203,7 +203,7 @@ func TestAggregate_CCSumsAsVolume(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"200cc water"},
 		[]string{"300cc water"},
-	), SystemUS)
+	), Options{System: SystemUS})
 	it, ok := find(items, "water")
 	if !ok {
 		t.Fatalf("water not found in %v", items)
@@ -214,7 +214,7 @@ func TestAggregate_CCSumsAsVolume(t *testing.T) {
 }
 
 func TestAggregate_JapaneseCupIs200ml(t *testing.T) {
-	us, _ := find(Aggregate(days([]string{"2 cups rice"}), SystemUS), "rice")
+	us, _ := find(Aggregate(days([]string{"2 cups rice"}), Options{System: SystemUS}), "rice")
 	if us.Line() != "2 cups rice" {
 		t.Errorf("US Line = %q, want %q", us.Line(), "2 cups rice")
 	}
@@ -224,9 +224,51 @@ func TestAggregate_JapaneseCupIs200ml(t *testing.T) {
 	jp, _ := find(Aggregate(days(
 		[]string{"2 cups rice"},
 		[]string{"100ml rice"},
-	), SystemJapanese), "rice")
+	), Options{System: SystemJapanese}), "rice")
 	if jp.Line() != "500ml rice" {
 		t.Errorf("JP Line = %q, want %q (2 JP cups=400ml + 100ml)", jp.Line(), "500ml rice")
+	}
+}
+
+func TestAggregate_ExcludesPantryStaples(t *testing.T) {
+	opts := Options{
+		System:  SystemUS,
+		Exclude: []string{"water", "salt", "soy sauce", "black pepper"},
+	}
+	items := Aggregate(days(
+		[]string{"200ml water", "1 tsp salt", "2 tbsp soy sauce", "1 tbsp light soy sauce",
+			"1/2 tsp freshly ground black pepper", "coconut water", "300g chicken",
+			"1 tsp cornstarch dissolved in 3x water"},
+	), opts)
+
+	present := map[string]bool{}
+	for _, it := range items {
+		present[it.Name] = true
+	}
+
+	// excluded
+	for _, name := range []string{"water", "salt", "soy sauce", "light soy sauce", "freshly ground black pepper"} {
+		if present[name] {
+			t.Errorf("%q should have been excluded", name)
+		}
+	}
+	// kept: distinct items that merely contain a staple word
+	for _, name := range []string{"coconut water", "chicken", "cornstarch dissolved in 3x water"} {
+		if !present[name] {
+			t.Errorf("%q should NOT have been excluded (found: %v)", name, present)
+		}
+	}
+}
+
+func TestDefaultStaples(t *testing.T) {
+	items := Aggregate(days(
+		[]string{"200ml water", "300g chicken"},
+	), Options{System: SystemUS, Exclude: DefaultStaples()})
+	if _, ok := find(items, "water"); ok {
+		t.Error("water should be excluded by the default staples")
+	}
+	if _, ok := find(items, "chicken"); !ok {
+		t.Error("chicken should remain")
 	}
 }
 

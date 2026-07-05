@@ -35,6 +35,11 @@ type PlannerConfig struct {
 	ShoppingEventDay  string `yaml:"shopping_event_day"`
 	Timezone          string `yaml:"timezone"`
 	MeasurementSystem string `yaml:"measurement_system"` // "us" (default) or "japanese"; sizes cup/tbsp/tsp
+
+	// PantryStaples are ingredient names to omit from the consolidated shopping
+	// list (they still appear in the per-recipe breakdown). Unset falls back to
+	// a built-in default; an explicit empty list disables exclusion.
+	PantryStaples []string `yaml:"pantry_staples"`
 }
 
 type StoreConfig struct {

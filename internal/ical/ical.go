@@ -16,9 +16,10 @@ type Generator struct {
 	shoppingEventTime planner.TimeOfDay
 	shoppingEventDay  time.Weekday
 	measurementSystem shopping.System
+	pantryStaples     []string
 }
 
-func NewGenerator(p *planner.Planner, shoppingTime string, shoppingDay string, measurementSystem string) (*Generator, error) {
+func NewGenerator(p *planner.Planner, shoppingTime string, shoppingDay string, measurementSystem string, pantryStaples []string) (*Generator, error) {
 	tod, err := planner.ParseTimeOfDay(shoppingTime)
 	if err != nil {
 		return nil, err
@@ -29,11 +30,19 @@ func NewGenerator(p *planner.Planner, shoppingTime string, shoppingDay string, m
 		return nil, err
 	}
 
+	// A nil list means "use the built-in default"; an explicit empty list
+	// disables exclusion entirely.
+	staples := pantryStaples
+	if staples == nil {
+		staples = shopping.DefaultStaples()
+	}
+
 	return &Generator{
 		planner:           p,
 		shoppingEventTime: tod,
 		shoppingEventDay:  day,
 		measurementSystem: shopping.ParseSystem(measurementSystem),
+		pantryStaples:     staples,
 	}, nil
 }
 
@@ -158,7 +167,8 @@ func (g *Generator) writeShoppingEvent(b *strings.Builder, week *model.WeekPlan)
 	desc.WriteString(fmt.Sprintf("Meal plan: %s\\n\\n", week.MealPlanName))
 
 	desc.WriteString("SHOPPING LIST\\n")
-	for _, item := range shopping.Aggregate(week.Days, g.measurementSystem) {
+	opts := shopping.Options{System: g.measurementSystem, Exclude: g.pantryStaples}
+	for _, item := range shopping.Aggregate(week.Days, opts) {
 		desc.WriteString("- ")
 		desc.WriteString(item.Line())
 		desc.WriteString("\\n")

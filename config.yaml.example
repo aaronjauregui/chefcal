@@ -20,6 +20,22 @@ planner:
   shopping_event_day: "Saturday"
   timezone: "Australia/Sydney"
   measurement_system: "us"  # "us" or "japanese"; sizes cup/tbsp/tsp for the shopping list
+  # Ingredient names omitted from the consolidated shopping list (they still
+  # appear in the per-recipe breakdown). Unset uses a built-in default of
+  # [water, ice]; an explicit empty list disables exclusion. Single-word names
+  # match the whole ingredient exactly ("water" won't drop "coconut water");
+  # multi-word names match as a phrase ("soy sauce" also drops "light soy sauce").
+  # pantry_staples:
+  #   - water
+  #   - ice
+  #   - salt
+  #   - black pepper
+  #   - soy sauce
+  #   - mirin
+  #   - sake
+  #   - sesame oil
+  #   - sugar
+  #   - oil
 
 store:
   path: "data/weeks.json"

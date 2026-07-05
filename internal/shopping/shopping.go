@@ -61,6 +61,63 @@ func (sys System) factor(info unitInfo) float64 {
 	return info.factor
 }
 
+// Options configures how ingredients are aggregated.
+type Options struct {
+	System System
+	// Exclude lists pantry-staple names to omit from the consolidated list,
+	// matched against the normalised ingredient name. A single-word entry
+	// matches only when it is the whole name (so "water" drops "water" but not
+	// "coconut water"); a multi-word entry matches as a contiguous whole-word
+	// phrase (so "soy sauce" also drops "light soy sauce").
+	Exclude []string
+}
+
+// DefaultStaples is the built-in exclusion set used when none is configured:
+// items that are essentially never bought per recipe.
+func DefaultStaples() []string { return []string{"water", "ice"} }
+
+type stapleMatcher [][]string
+
+func compileStaples(names []string) stapleMatcher {
+	var m stapleMatcher
+	for _, n := range names {
+		if w := strings.Fields(strings.ToLower(n)); len(w) > 0 {
+			m = append(m, w)
+		}
+	}
+	return m
+}
+
+func (m stapleMatcher) excludes(name string) bool {
+	w := strings.Fields(strings.ToLower(name))
+	for _, s := range m {
+		if len(s) == 1 {
+			if len(w) == 1 && w[0] == s[0] {
+				return true
+			}
+		} else if containsSeq(w, s) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsSeq(hay, needle []string) bool {
+	for i := 0; i+len(needle) <= len(hay); i++ {
+		match := true
+		for j := range needle {
+			if hay[i+j] != needle[j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return true
+		}
+	}
+	return false
+}
+
 // Item is one line of the consolidated shopping list.
 type Item struct {
 	Name    string   // display name, e.g. "chicken breast"
@@ -80,7 +137,9 @@ func (i Item) Line() string {
 // Aggregate consolidates the ingredients of every recipe in days into a
 // deduplicated, sorted shopping list. Parsed items come first (alphabetical),
 // followed by verbatim passthrough items.
-func Aggregate(days []model.DayMeal, sys System) []Item {
+func Aggregate(days []model.DayMeal, opts Options) []Item {
+	staples := compileStaples(opts.Exclude)
+
 	builders := map[string]*builder{}
 	var order []string
 
@@ -89,7 +148,7 @@ func Aggregate(days []model.DayMeal, sys System) []Item {
 
 	for _, d := range days {
 		for _, raw := range d.Recipe.RecipeIngredient {
-			p, ok := parse(raw, sys)
+			p, ok := parse(raw, opts.System)
 			if !ok {
 				name := strings.TrimSpace(raw)
 				key := strings.ToLower(name)
@@ -120,7 +179,11 @@ func Aggregate(days []model.DayMeal, sys System) []Item {
 
 	var items []Item
 	for _, k := range order {
-		items = append(items, builders[k].finalize(sys))
+		b := builders[k]
+		if staples.excludes(b.name) {
+			continue // pantry staple: omit from the consolidated list
+		}
+		items = append(items, b.finalize(opts.System))
 	}
 	sort.SliceStable(items, func(i, j int) bool {
 		return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
@@ -128,7 +191,11 @@ func Aggregate(days []model.DayMeal, sys System) []Item {
 
 	var pass []Item
 	for _, k := range passOrder {
-		pass = append(pass, *passthrough[k])
+		it := passthrough[k]
+		if staples.excludes(it.Name) {
+			continue
+		}
+		pass = append(pass, *it)
 	}
 	sort.SliceStable(pass, func(i, j int) bool {
 		return strings.ToLower(pass[i].Name) < strings.ToLower(pass[j].Name)

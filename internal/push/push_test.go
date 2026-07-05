@@ -38,7 +38,7 @@ func newPusher(t *testing.T, dav CalDAV) (*Pusher, *time.Location) {
 	if err != nil {
 		t.Fatalf("NewPlanner: %v", err)
 	}
-	gen, err := ical.NewGenerator(p, "12:00", "Saturday", "us")
+	gen, err := ical.NewGenerator(p, "12:00", "Saturday", "us", nil)
 	if err != nil {
 		t.Fatalf("NewGenerator: %v", err)
 	}
