@@ -8,6 +8,7 @@ import (
 
 	"github.com/aaronjauregui/chefcal/internal/model"
 	"github.com/aaronjauregui/chefcal/internal/planner"
+	"github.com/aaronjauregui/chefcal/internal/shopping"
 )
 
 type Generator struct {
@@ -147,6 +148,16 @@ func (g *Generator) writeShoppingEvent(b *strings.Builder, week *model.WeekPlan)
 	var desc strings.Builder
 	desc.WriteString(fmt.Sprintf("Shopping list for week of %s\\n", week.WeekStart.Format("Jan 2")))
 	desc.WriteString(fmt.Sprintf("Meal plan: %s\\n\\n", week.MealPlanName))
+
+	desc.WriteString("SHOPPING LIST\\n")
+	for _, item := range shopping.Aggregate(week.Days) {
+		desc.WriteString("- ")
+		desc.WriteString(item.Line())
+		desc.WriteString("\\n")
+	}
+	desc.WriteString("\\n")
+
+	desc.WriteString("By recipe:\\n")
 	for _, day := range week.Days {
 		desc.WriteString(fmt.Sprintf("== %s (%s) ==\\n", day.RecipeName, day.Date.Format("Monday")))
 		for _, ing := range day.Recipe.RecipeIngredient {

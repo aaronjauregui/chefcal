@@ -8,7 +8,7 @@ A Go web service that generates weekly meal plans from recipes stored in Nextclo
 2. It reads meal plan files (`.md`) that list recipe names, and recipe data (`recipe.json`) from your Nextcloud directories
 3. When you generate a week, it randomly picks 7 recipes from the chosen meal plan and assigns one per day (Monday–Sunday)
 4. Each dinner event is timed so that cooking finishes by 18:30 (configurable), with the start time calculated from the recipe's total prep/cook time
-5. A shopping list event is created on Saturday at noon (configurable) containing all aggregated ingredients for the week
+5. A shopping list event is created on Saturday at noon (configurable). Ingredients are deduplicated across recipes — quantities in compatible units are summed (e.g. `200g chicken` + `300g chicken` → `500g chicken`) — and presented as a consolidated list, with a per-recipe breakdown kept below for reference
 6. The calendar is served as a standard `.ics` feed that any calendar app can subscribe to
 
 ChefCal supports two delivery models:
@@ -65,6 +65,16 @@ JSON files following the schema.org `Recipe` format. The fields used by ChefCal 
 
 - `totalTime` — ISO 8601 duration used to calculate when cooking should start (defaults to 30 minutes if missing or unparseable)
 - `recipeIngredient` — used for dinner event descriptions and the weekly shopping list
+
+#### Shopping List Deduplication
+
+The weekly shopping list consolidates ingredients across recipes. Each ingredient string is parsed into a quantity, unit, and name; entries with the same name and compatible units are summed:
+
+- Mass (`g`, `kg`, `oz`, `lb`), volume (`ml`, `l`, `tsp`, `tbsp`, `cup`, `fl oz`), and counts are each summed within their own dimension, converting units as needed (`1 lb` + `200g` → `654g`).
+- Incompatible units for the same ingredient are shown side by side (`200g + 1 cup rice`).
+- Name matching is deliberately conservative: cosmetic size words (`large`, `small`) and simple plurals are folded, but material descriptors are kept, so `chicken breast`, `chicken thigh`, and `chicken stock` stay separate.
+
+Parsing is best-effort. Anything without a recognisable quantity (`Salt to taste`, `Olive oil`) is passed through verbatim — **the list never drops an ingredient**. A per-recipe breakdown is always included below the consolidated list.
 
 ## Getting Started
 
