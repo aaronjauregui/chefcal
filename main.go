@@ -20,8 +20,9 @@ import (
 func main() {
 	configPath := flag.String("config", "config.yaml", "path to configuration file")
 	generate := flag.Bool("generate", false, "generate the next unplanned week, save it, and exit")
+	regenerate := flag.Bool("regenerate", false, "re-roll the earliest upcoming planned week in place, and exit")
 	pushCal := flag.Bool("push", false, "reconcile stored plans to the Nextcloud calendar and exit")
-	planName := flag.String("plan", "", "meal plan for -generate (random if empty)")
+	planName := flag.String("plan", "", "meal plan for -generate/-regenerate (random / current plan if empty)")
 	flag.Parse()
 
 	cfg, err := config.Load(*configPath)
@@ -55,10 +56,15 @@ func main() {
 
 	// One-shot actions (suitable for a cronjob). When either is set we run the
 	// requested steps and exit rather than starting the HTTP server.
-	if *generate || *pushCal {
+	if *generate || *regenerate || *pushCal {
 		if *generate {
 			if err := generateNextWeek(p, st, *planName); err != nil {
 				log.Fatalf("Failed to generate week: %v", err)
+			}
+		}
+		if *regenerate {
+			if err := regenerateWeek(p, st, *planName); err != nil {
+				log.Fatalf("Failed to regenerate week: %v", err)
 			}
 		}
 		if *pushCal {
@@ -103,6 +109,30 @@ func generateNextWeek(p *planner.Planner, st *store.Store, planName string) erro
 	}
 
 	log.Printf("Generated week starting %s with plan %q", weekStart.Format("2006-01-02"), planName)
+	return nil
+}
+
+// regenerateWeek re-rolls the earliest upcoming week in place, replacing its
+// recipes. With an empty planName the week's existing meal plan is reused, so
+// it re-rolls within the same plan; otherwise it switches to planName.
+func regenerateWeek(p *planner.Planner, st *store.Store, planName string) error {
+	week, ok := st.EarliestCurrentWeek()
+	if !ok {
+		return fmt.Errorf("no upcoming week to regenerate; run -generate first")
+	}
+	if planName == "" {
+		planName = week.MealPlanName
+	}
+
+	fresh, err := p.GenerateWeek(week.WeekStart, planName)
+	if err != nil {
+		return fmt.Errorf("regenerating week: %w", err)
+	}
+	if err := st.Save(fresh); err != nil {
+		return fmt.Errorf("saving week: %w", err)
+	}
+
+	log.Printf("Regenerated week starting %s with plan %q", week.WeekStart.Format("2006-01-02"), planName)
 	return nil
 }
 

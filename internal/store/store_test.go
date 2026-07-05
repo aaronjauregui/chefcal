@@ -136,3 +136,35 @@ func TestNew_InvalidPath(t *testing.T) {
 		t.Error("expected error for invalid JSON")
 	}
 }
+
+func TestEarliestCurrentWeek(t *testing.T) {
+	s, err := New(tempStorePath(t), time.UTC)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	if _, ok := s.EarliestCurrentWeek(); ok {
+		t.Error("expected no week in an empty store")
+	}
+
+	now := time.Now().UTC()
+	sat := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	later := sat.AddDate(0, 0, 14)
+	sooner := sat.AddDate(0, 0, 7)
+
+	// Save out of order to prove it returns the earliest, not the last saved.
+	if err := s.Save(makeWeek(later, "Later")); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if err := s.Save(makeWeek(sooner, "Sooner")); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+
+	w, ok := s.EarliestCurrentWeek()
+	if !ok {
+		t.Fatal("expected a week")
+	}
+	if w.MealPlanName != "Sooner" {
+		t.Errorf("earliest = %q, want %q", w.MealPlanName, "Sooner")
+	}
+}

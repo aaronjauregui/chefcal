@@ -210,10 +210,11 @@ Run with no action flags to start the HTTP server (pull mode). Passing `-generat
 |------|-------------|
 | `-config <path>` | Path to the configuration file (default `config.yaml`) |
 | `-generate` | Generate the next unplanned week, save it to the store, and exit |
-| `-plan <name>` | Meal plan to use with `-generate` (random if omitted) |
+| `-regenerate` | Re-roll the earliest upcoming planned week in place (new recipes), and exit |
+| `-plan <name>` | Meal plan for `-generate`/`-regenerate` (random for generate, the week's current plan for regenerate, if omitted) |
 | `-push` | Reconcile the stored plans onto the Nextcloud calendar and exit |
 
-`-generate` and `-push` can be combined in one invocation (generate runs first).
+These actions can be combined in one invocation and run in order generate → regenerate → push, so e.g. `chefcal -regenerate -push` re-rolls this week and republishes it. Because push resource UIDs are keyed by date, the re-rolled events update in place rather than duplicating. `-regenerate` reuses the week's existing meal plan unless `-plan` overrides it.
 
 ## Push Mode
 
