@@ -34,6 +34,7 @@ type PlannerConfig struct {
 	ShoppingEventTime string `yaml:"shopping_event_time"`
 	ShoppingEventDay  string `yaml:"shopping_event_day"`
 	Timezone          string `yaml:"timezone"`
+	MeasurementSystem string `yaml:"measurement_system"` // "us" (default) or "japanese"; sizes cup/tbsp/tsp
 }
 
 type StoreConfig struct {
@@ -53,6 +54,7 @@ func Load(path string) (*Config, error) {
 			ShoppingEventTime: "12:00",
 			ShoppingEventDay:  "Saturday",
 			Timezone:          "Australia/Sydney",
+			MeasurementSystem: "us",
 		},
 		Store: StoreConfig{Path: "data/weeks.json"},
 		Nextcloud: NextcloudConfig{

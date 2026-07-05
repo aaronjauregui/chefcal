@@ -33,7 +33,7 @@ func TestParse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
-			p, ok := parse(tt.in)
+			p, ok := parse(tt.in, SystemUS)
 			if ok != tt.wantOK {
 				t.Fatalf("parse(%q) ok = %v, want %v", tt.in, ok, tt.wantOK)
 			}
@@ -107,7 +107,7 @@ func TestAggregate_SumsSameUnit(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"200g chicken"},
 		[]string{"300g chicken"},
-	))
+	), SystemUS)
 	it, ok := find(items, "chicken")
 	if !ok {
 		t.Fatalf("chicken not found in %v", items)
@@ -125,7 +125,7 @@ func TestAggregate_ConvertsWithinDimension(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"1 lb beef"},
 		[]string{"200g beef"},
-	))
+	), SystemUS)
 	it, _ := find(items, "beef")
 	if it.Line() != "654g beef" {
 		t.Errorf("Line = %q, want %q", it.Line(), "654g beef")
@@ -137,7 +137,7 @@ func TestAggregate_IncompatibleUnitsKeptSeparate(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"1 cup rice"},
 		[]string{"200g rice"},
-	))
+	), SystemUS)
 	it, _ := find(items, "rice")
 	// mass bucket is formatted before volume bucket
 	if it.Line() != "200g + 1 cup rice" {
@@ -149,7 +149,7 @@ func TestAggregate_CountMerges(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"2 eggs"},
 		[]string{"1 egg"},
-	))
+	), SystemUS)
 	it, ok := find(items, "eggs") // first-seen display form
 	if !ok {
 		t.Fatalf("eggs not found in %v", items)
@@ -163,7 +163,7 @@ func TestAggregate_PassthroughNeverDropped(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"Salt to taste", "200g chicken"},
 		[]string{"Salt to taste"},
-	))
+	), SystemUS)
 	it, ok := find(items, "Salt to taste")
 	if !ok {
 		t.Fatalf("passthrough item lost: %v", items)
@@ -190,12 +190,43 @@ func TestAggregate_DistinctNamesNotMerged(t *testing.T) {
 	items := Aggregate(days(
 		[]string{"200g chicken breast"},
 		[]string{"200g chicken thigh"},
-	))
+	), SystemUS)
 	if _, ok := find(items, "chicken breast"); !ok {
 		t.Error("chicken breast missing")
 	}
 	if _, ok := find(items, "chicken thigh"); !ok {
 		t.Error("chicken thigh missing")
+	}
+}
+
+func TestAggregate_CCSumsAsVolume(t *testing.T) {
+	items := Aggregate(days(
+		[]string{"200cc water"},
+		[]string{"300cc water"},
+	), SystemUS)
+	it, ok := find(items, "water")
+	if !ok {
+		t.Fatalf("water not found in %v", items)
+	}
+	if it.Line() != "500cc water" {
+		t.Errorf("Line = %q, want %q", it.Line(), "500cc water")
+	}
+}
+
+func TestAggregate_JapaneseCupIs200ml(t *testing.T) {
+	us, _ := find(Aggregate(days([]string{"2 cups rice"}), SystemUS), "rice")
+	if us.Line() != "2 cups rice" {
+		t.Errorf("US Line = %q, want %q", us.Line(), "2 cups rice")
+	}
+
+	// Japanese cup is 200ml, so 2 cups = 400ml. Mixing with a metric volume
+	// forces the base-unit fallback and proves the factor: 400ml + 100ml.
+	jp, _ := find(Aggregate(days(
+		[]string{"2 cups rice"},
+		[]string{"100ml rice"},
+	), SystemJapanese), "rice")
+	if jp.Line() != "500ml rice" {
+		t.Errorf("JP Line = %q, want %q (2 JP cups=400ml + 100ml)", jp.Line(), "500ml rice")
 	}
 }
 

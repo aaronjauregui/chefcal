@@ -15,9 +15,10 @@ type Generator struct {
 	planner           *planner.Planner
 	shoppingEventTime planner.TimeOfDay
 	shoppingEventDay  time.Weekday
+	measurementSystem shopping.System
 }
 
-func NewGenerator(p *planner.Planner, shoppingTime string, shoppingDay string) (*Generator, error) {
+func NewGenerator(p *planner.Planner, shoppingTime string, shoppingDay string, measurementSystem string) (*Generator, error) {
 	tod, err := planner.ParseTimeOfDay(shoppingTime)
 	if err != nil {
 		return nil, err
@@ -32,6 +33,7 @@ func NewGenerator(p *planner.Planner, shoppingTime string, shoppingDay string) (
 		planner:           p,
 		shoppingEventTime: tod,
 		shoppingEventDay:  day,
+		measurementSystem: shopping.ParseSystem(measurementSystem),
 	}, nil
 }
 
@@ -150,7 +152,7 @@ func (g *Generator) writeShoppingEvent(b *strings.Builder, week *model.WeekPlan)
 	desc.WriteString(fmt.Sprintf("Meal plan: %s\\n\\n", week.MealPlanName))
 
 	desc.WriteString("SHOPPING LIST\\n")
-	for _, item := range shopping.Aggregate(week.Days) {
+	for _, item := range shopping.Aggregate(week.Days, g.measurementSystem) {
 		desc.WriteString("- ")
 		desc.WriteString(item.Line())
 		desc.WriteString("\\n")

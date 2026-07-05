@@ -74,7 +74,7 @@ func setupServer(t *testing.T) (*Server, *mockSource) {
 		t.Fatalf("NewPlanner: %v", err)
 	}
 
-	ig, err := ical.NewGenerator(p, "12:00", "Saturday")
+	ig, err := ical.NewGenerator(p, "12:00", "Saturday", "us")
 	if err != nil {
 		t.Fatalf("NewGenerator: %v", err)
 	}

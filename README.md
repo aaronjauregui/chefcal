@@ -70,7 +70,8 @@ JSON files following the schema.org `Recipe` format. The fields used by ChefCal 
 
 The weekly shopping list consolidates ingredients across recipes. Each ingredient string is parsed into a quantity, unit, and name; entries with the same name and compatible units are summed:
 
-- Mass (`g`, `kg`, `oz`, `lb`), volume (`ml`, `l`, `tsp`, `tbsp`, `cup`, `fl oz`), and counts are each summed within their own dimension, converting units as needed (`1 lb` + `200g` → `654g`).
+- Mass (`g`, `kg`, `oz`, `lb`), volume (`ml`, `cc`, `l`, `tsp`, `tbsp`, `cup`, `fl oz`), and counts are each summed within their own dimension, converting units as needed (`1 lb` + `200g` → `654g`).
+- `cc` is treated as millilitres. The size of `cup`/`tbsp`/`tsp` follows `planner.measurement_system`: `us` (cup 236ml, tbsp 14.79ml, tsp 4.93ml) or `japanese` (cup 200ml, tbsp 15ml, tsp 5ml).
 - Incompatible units for the same ingredient are shown side by side (`200g + 1 cup rice`).
 - Name matching is deliberately conservative: cosmetic size words (`large`, `small`) and simple plurals are folded, but material descriptors are kept, so `chicken breast`, `chicken thigh`, and `chicken stock` stay separate.
 
@@ -149,6 +150,7 @@ store:
 | `planner.shopping_event_time` | Time for the shopping list event | `12:00` |
 | `planner.shopping_event_day` | Day of week for the shopping list event | `Saturday` |
 | `planner.timezone` | IANA timezone for calendar events | `Australia/Sydney` |
+| `planner.measurement_system` | `us` or `japanese`; sizes cup/tbsp/tsp when summing the shopping list | `us` |
 | `store.path` | Path to the JSON file storing generated weeks | `data/weeks.json` |
 
 ## API Endpoints

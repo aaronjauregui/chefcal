@@ -19,6 +19,7 @@ planner:
   shopping_event_time: "12:00"
   shopping_event_day: "Saturday"
   timezone: "Australia/Sydney"
+  measurement_system: "us"  # "us" or "japanese"; sizes cup/tbsp/tsp for the shopping list
 
 store:
   path: "data/weeks.json"

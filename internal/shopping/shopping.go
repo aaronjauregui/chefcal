@@ -27,6 +27,40 @@ const (
 	DimCount
 )
 
+// System selects the measuring conventions for units whose size differs by
+// locale. Metric mass/volume (g, ml, cc, ...) are identical across systems;
+// only cup/tablespoon/teaspoon differ.
+type System int
+
+const (
+	SystemUS System = iota
+	SystemJapanese
+)
+
+// ParseSystem maps a config string to a System, defaulting to US.
+func ParseSystem(s string) System {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "japanese", "japan", "jp":
+		return SystemJapanese
+	default:
+		return SystemUS
+	}
+}
+
+// jpFactors overrides the to-base (ml) factor for the locale-dependent volume
+// units under the Japanese system: cup 200ml, tablespoon 15ml, teaspoon 5ml.
+var jpFactors = map[string]float64{"cup": 200, "tbsp": 15, "tsp": 5}
+
+// factor returns the to-base conversion factor for a unit under this system.
+func (sys System) factor(info unitInfo) float64 {
+	if sys == SystemJapanese {
+		if f, ok := jpFactors[info.canonical]; ok {
+			return f
+		}
+	}
+	return info.factor
+}
+
 // Item is one line of the consolidated shopping list.
 type Item struct {
 	Name    string   // display name, e.g. "chicken breast"
@@ -46,7 +80,7 @@ func (i Item) Line() string {
 // Aggregate consolidates the ingredients of every recipe in days into a
 // deduplicated, sorted shopping list. Parsed items come first (alphabetical),
 // followed by verbatim passthrough items.
-func Aggregate(days []model.DayMeal) []Item {
+func Aggregate(days []model.DayMeal, sys System) []Item {
 	builders := map[string]*builder{}
 	var order []string
 
@@ -55,7 +89,7 @@ func Aggregate(days []model.DayMeal) []Item {
 
 	for _, d := range days {
 		for _, raw := range d.Recipe.RecipeIngredient {
-			p, ok := parse(raw)
+			p, ok := parse(raw, sys)
 			if !ok {
 				name := strings.TrimSpace(raw)
 				key := strings.ToLower(name)
@@ -86,7 +120,7 @@ func Aggregate(days []model.DayMeal) []Item {
 
 	var items []Item
 	for _, k := range order {
-		items = append(items, builders[k].finalize())
+		items = append(items, builders[k].finalize(sys))
 	}
 	sort.SliceStable(items, func(i, j int) bool {
 		return strings.ToLower(items[i].Name) < strings.ToLower(items[j].Name)
@@ -134,7 +168,8 @@ var units = map[string]unitInfo{
 	"lb": {"lb", DimMass, 453.592}, "lbs": {"lb", DimMass, 453.592}, "pound": {"lb", DimMass, 453.592}, "pounds": {"lb", DimMass, 453.592},
 
 	"ml": {"ml", DimVolume, 1}, "milliliter": {"ml", DimVolume, 1}, "milliliters": {"ml", DimVolume, 1}, "millilitre": {"ml", DimVolume, 1}, "millilitres": {"ml", DimVolume, 1},
-	"l": {"l", DimVolume, 1000}, "liter": {"l", DimVolume, 1000}, "liters": {"l", DimVolume, 1000}, "litre": {"l", DimVolume, 1000}, "litres": {"l", DimVolume, 1000},
+	"cc": {"cc", DimVolume, 1}, // cubic centimetre; common in Japanese recipes (= 1 ml)
+	"l":  {"l", DimVolume, 1000}, "liter": {"l", DimVolume, 1000}, "liters": {"l", DimVolume, 1000}, "litre": {"l", DimVolume, 1000}, "litres": {"l", DimVolume, 1000},
 	"tsp": {"tsp", DimVolume, 4.92892}, "teaspoon": {"tsp", DimVolume, 4.92892}, "teaspoons": {"tsp", DimVolume, 4.92892},
 	"tbsp": {"tbsp", DimVolume, 14.7868}, "tbs": {"tbsp", DimVolume, 14.7868}, "tablespoon": {"tbsp", DimVolume, 14.7868}, "tablespoons": {"tbsp", DimVolume, 14.7868},
 	"cup": {"cup", DimVolume, 236.588}, "cups": {"cup", DimVolume, 236.588},
@@ -159,7 +194,7 @@ var qtyRe = regexp.MustCompile(`^\s*(` + qtyTok + `)(?:(?:\s*[-–—]\s*|\s+to\
 
 var parenRe = regexp.MustCompile(`\([^)]*\)`)
 
-func parse(raw string) (parsed, bool) {
+func parse(raw string, sys System) (parsed, bool) {
 	idx := qtyRe.FindStringSubmatchIndex(raw)
 	if idx == nil {
 		return parsed{}, false // no leading quantity: pass through verbatim
@@ -184,7 +219,7 @@ func parse(raw string) (parsed, bool) {
 	if !hasUnit {
 		return parsed{name: name, dim: DimCount, base: val}, true
 	}
-	return parsed{name: name, dim: info.dim, base: val * info.factor, unit: info.canonical}, true
+	return parsed{name: name, dim: info.dim, base: val * sys.factor(info), unit: info.canonical}, true
 }
 
 func parseValue(tok string) (float64, bool) {
@@ -363,13 +398,13 @@ func (b *builder) add(p parsed) {
 	}
 }
 
-func (b *builder) finalize() Item {
+func (b *builder) finalize(sys System) Item {
 	var parts []string
 	if b.mass.used {
-		parts = append(parts, fmtDim(b.mass, "g"))
+		parts = append(parts, fmtDim(b.mass, "g", sys))
 	}
 	if b.vol.used {
-		parts = append(parts, fmtDim(b.vol, "ml"))
+		parts = append(parts, fmtDim(b.vol, "ml", sys))
 	}
 	if b.count.used {
 		parts = append(parts, num2(b.count.base))
@@ -383,9 +418,9 @@ func (b *builder) finalize() Item {
 }
 
 // fmtDim formats an accumulated mass/volume. baseUnit is "g" or "ml".
-func fmtDim(a dimAcc, baseUnit string) string {
+func fmtDim(a dimAcc, baseUnit string, sys System) string {
 	if !a.mixed && a.unit != "" {
-		return fmtValUnit(a.base/units[a.unit].factor, a.unit)
+		return fmtValUnit(a.base/sys.factor(units[a.unit]), a.unit)
 	}
 	if a.base >= 1000 {
 		if baseUnit == "g" {
@@ -408,6 +443,8 @@ func fmtValUnit(v float64, unit string) string {
 		return num2(v) + " lb"
 	case "ml":
 		return num0(v) + "ml"
+	case "cc":
+		return num0(v) + "cc"
 	case "l":
 		return num2(v) + "L"
 	case "tsp":
