@@ -50,12 +50,14 @@ func (p *Pusher) Reconcile(weeks []*model.WeekPlan, now time.Time) (Result, erro
 
 	today := startOfDay(now, p.loc)
 
-	// Desired: every entry dated today or later, keyed by resource name.
+	// Desired: every entry of every week we were given, keyed by resource name.
+	// weeks is already filtered to weeks that have not fully passed, so we
+	// publish the whole of the current week — including days before today and,
+	// crucially, the weekly shopping-list event, which sits on the week's
+	// shopping day and may already be in the past when a week is back-filled
+	// mid-week. Deletion (below) still leaves past events untouched.
 	desired := make(map[string]ical.Event)
 	for _, e := range p.gen.Events(weeks) {
-		if startOfDay(e.Date, p.loc).Before(today) {
-			continue // past entry; leave history untouched
-		}
 		desired[e.ResourceName] = e
 	}
 

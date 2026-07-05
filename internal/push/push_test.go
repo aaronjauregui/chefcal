@@ -59,12 +59,12 @@ func weekAt(weekStart time.Time) *model.WeekPlan {
 	return w
 }
 
-func TestReconcile_PushesFutureSkipsPast(t *testing.T) {
+func TestReconcile_PublishesWholeCurrentWeek(t *testing.T) {
 	dav := newFakeDAV()
 	p, loc := newPusher(t, dav)
 
-	now := time.Date(2026, 4, 15, 9, 0, 0, 0, loc)       // Wednesday
-	weekStart := time.Date(2026, 4, 11, 0, 0, 0, 0, loc) // Saturday: Sat-Fri spans the "now"
+	now := time.Date(2026, 4, 15, 9, 0, 0, 0, loc)       // mid-week (Wednesday)
+	weekStart := time.Date(2026, 4, 11, 0, 0, 0, 0, loc) // Saturday: Sat-Fri spans "now"
 
 	res, err := p.Reconcile([]*model.WeekPlan{weekAt(weekStart)}, now)
 	if err != nil {
@@ -74,25 +74,21 @@ func TestReconcile_PushesFutureSkipsPast(t *testing.T) {
 		t.Error("expected EnsureCalendar to be called")
 	}
 
-	// Days Sat 11 .. Tue 14 are in the past and must be skipped; Wed 15 .. Fri 17
-	// (3 dinners) plus the shopping event (Sat 11 — past, skipped) should push.
-	for name := range dav.put {
-		date, ok := ical.ParseResourceDate(name, loc)
-		if !ok {
-			t.Fatalf("pushed unrecognised resource %q", name)
+	// The whole week is published: 7 dinners + 1 shopping event, including the
+	// days (and the shopping event) that fall before `now`.
+	if res.Pushed != 8 {
+		t.Errorf("Pushed = %d, want 8 (whole week incl. past days)", res.Pushed)
+	}
+	for _, name := range []string{
+		"chefcal-dinner-2026-04-11.ics",   // Saturday, before now
+		"chefcal-dinner-2026-04-14.ics",   // Tuesday, before now
+		"chefcal-dinner-2026-04-15.ics",   // now
+		"chefcal-dinner-2026-04-17.ics",   // Friday
+		"chefcal-shopping-2026-04-11.ics", // shopping on the (past) Saturday
+	} {
+		if _, ok := dav.put[name]; !ok {
+			t.Errorf("expected %s to be published", name)
 		}
-		if date.Before(time.Date(2026, 4, 15, 0, 0, 0, 0, loc)) {
-			t.Errorf("pushed past-dated entry %q", name)
-		}
-	}
-	if got := len(dav.put); got != res.Pushed {
-		t.Errorf("Pushed count %d != map size %d", res.Pushed, got)
-	}
-	if _, ok := dav.put["chefcal-dinner-2026-04-15.ics"]; !ok {
-		t.Error("expected Wednesday dinner to be pushed")
-	}
-	if _, ok := dav.put["chefcal-dinner-2026-04-14.ics"]; ok {
-		t.Error("Tuesday dinner is in the past and should not be pushed")
 	}
 }
 

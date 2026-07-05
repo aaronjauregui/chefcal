@@ -252,11 +252,11 @@ A typical cron setup — a new week each Saturday morning, plus a nightly reconc
 
 ### How reconciliation works
 
-Each `-push` makes the calendar match the current stored plans, restricted to entries dated **today or later**:
+Each `-push` makes the calendar match the current stored plans (weeks that have not fully passed):
 
-- **Created / updated in place** — event UIDs and resource names are deterministic functions of `(kind, date)`, so re-pushing the same day overwrites its event rather than creating a duplicate.
-- **Deleted** — any ChefCal-owned future entry that is no longer in the plan (e.g. a retracted or regenerated week) is removed.
-- **Never touched** — entries dated before today. Past events are left in place as history.
+- **Created / updated in place** — event UIDs and resource names are deterministic functions of `(kind, date)`, so re-pushing the same day overwrites its event rather than creating a duplicate. The **whole** of each current week is published, including days before today and the weekly shopping-list event — so back-filling the current week mid-week still publishes its aggregated shopping list even though it sits on the (now past) shopping day.
+- **Deleted** — any ChefCal-owned **future** entry that is no longer in the plan (e.g. a retracted or regenerated week) is removed.
+- **Never deleted** — entries dated before today are left in place as history, even if they drop out of the plan.
 
 Because reconciliation compares against what is actually on the server, it is self-healing: if the local store is wiped or the calendar is hand-edited, the next push converges. The calendar — not the local store — is the source of truth for what is published.
 
