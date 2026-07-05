@@ -23,6 +23,7 @@ func main() {
 	regenerate := flag.Bool("regenerate", false, "re-roll the earliest upcoming planned week in place, and exit")
 	pushCal := flag.Bool("push", false, "reconcile stored plans to the Nextcloud calendar and exit")
 	planName := flag.String("plan", "", "meal plan for -generate/-regenerate (random / current plan if empty)")
+	weekArg := flag.String("week", "", "target week start date (YYYY-MM-DD) for -generate; default is the next unplanned week")
 	flag.Parse()
 
 	cfg, err := config.Load(*configPath)
@@ -58,7 +59,7 @@ func main() {
 	// requested steps and exit rather than starting the HTTP server.
 	if *generate || *regenerate || *pushCal {
 		if *generate {
-			if err := generateNextWeek(p, st, *planName); err != nil {
+			if err := generateNextWeek(p, st, *planName, *weekArg); err != nil {
 				log.Fatalf("Failed to generate week: %v", err)
 			}
 		}
@@ -86,7 +87,7 @@ func main() {
 
 // generateNextWeek generates and stores the next week that isn't already
 // planned, mirroring the behaviour of the HTTP /generate endpoint.
-func generateNextWeek(p *planner.Planner, st *store.Store, planName string) error {
+func generateNextWeek(p *planner.Planner, st *store.Store, planName, weekArg string) error {
 	if planName == "" {
 		var err error
 		planName, err = p.PickRandomPlan()
@@ -95,9 +96,20 @@ func generateNextWeek(p *planner.Planner, st *store.Store, planName string) erro
 		}
 	}
 
-	weekStart := planner.NextWeekStart(time.Now(), p.Location())
-	for st.HasWeek(weekStart) {
-		weekStart = weekStart.AddDate(0, 0, 7)
+	var weekStart time.Time
+	if weekArg != "" {
+		// Explicit week start (e.g. back-dating to fill the current week).
+		// Save overwrites any existing plan for that week.
+		var err error
+		weekStart, err = time.ParseInLocation("2006-01-02", weekArg, p.Location())
+		if err != nil {
+			return fmt.Errorf("parsing -week %q: %w", weekArg, err)
+		}
+	} else {
+		weekStart = planner.NextWeekStart(time.Now(), p.Location())
+		for st.HasWeek(weekStart) {
+			weekStart = weekStart.AddDate(0, 0, 7)
+		}
 	}
 
 	week, err := p.GenerateWeek(weekStart, planName)

@@ -212,6 +212,7 @@ Run with no action flags to start the HTTP server (pull mode). Passing `-generat
 | `-generate` | Generate the next unplanned week, save it to the store, and exit |
 | `-regenerate` | Re-roll the earliest upcoming planned week in place (new recipes), and exit |
 | `-plan <name>` | Meal plan for `-generate`/`-regenerate` (random for generate, the week's current plan for regenerate, if omitted) |
+| `-week <YYYY-MM-DD>` | Target week start for `-generate` (overwrites any plan for that week); default is the next unplanned week. Use to back-date and fill the current week |
 | `-push` | Reconcile the stored plans onto the Nextcloud calendar and exit |
 
 These actions can be combined in one invocation and run in order generate → regenerate → push, so e.g. `chefcal -regenerate -push` re-rolls this week and republishes it. Because push resource UIDs are keyed by date, the re-rolled events update in place rather than duplicating. `-regenerate` reuses the week's existing meal plan unless `-plan` overrides it.
