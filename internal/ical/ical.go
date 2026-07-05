@@ -39,7 +39,7 @@ func NewGenerator(p *planner.Planner, shoppingTime string, shoppingDay string, m
 
 func (g *Generator) Generate(weeks []*model.WeekPlan) string {
 	var b strings.Builder
-	g.writeHeader(&b)
+	g.writeHeader(&b, true)
 
 	for _, week := range weeks {
 		for i := range week.Days {
@@ -83,7 +83,7 @@ func (g *Generator) Events(weeks []*model.WeekPlan) []Event {
 
 func (g *Generator) buildEvent(kind string, date time.Time, writeVEvent func(*strings.Builder)) Event {
 	var b strings.Builder
-	g.writeHeader(&b)
+	g.writeHeader(&b, false)
 	writeVEvent(&b)
 	b.WriteString("END:VCALENDAR\r\n")
 	return Event{
@@ -94,14 +94,20 @@ func (g *Generator) buildEvent(kind string, date time.Time, writeVEvent func(*st
 	}
 }
 
-func (g *Generator) writeHeader(b *strings.Builder) {
+// writeHeader writes the VCALENDAR preamble. feed controls whether the
+// publish-only metadata (METHOD, X-WR-*) is included: it is required for the
+// subscribable .ics feed but forbidden on a CalDAV calendar object, which a
+// server such as SabreDAV rejects if METHOD is present.
+func (g *Generator) writeHeader(b *strings.Builder, feed bool) {
 	b.WriteString("BEGIN:VCALENDAR\r\n")
 	b.WriteString("VERSION:2.0\r\n")
 	b.WriteString("PRODID:-//ChefCal//Meal Planner//EN\r\n")
 	b.WriteString("CALSCALE:GREGORIAN\r\n")
-	b.WriteString("METHOD:PUBLISH\r\n")
-	b.WriteString("X-WR-CALNAME:Meal Plan\r\n")
-	writeField(b, "X-WR-TIMEZONE", g.planner.Location().String())
+	if feed {
+		b.WriteString("METHOD:PUBLISH\r\n")
+		b.WriteString("X-WR-CALNAME:Meal Plan\r\n")
+		writeField(b, "X-WR-TIMEZONE", g.planner.Location().String())
+	}
 }
 
 func (g *Generator) writeDinnerEvent(b *strings.Builder, day *model.DayMeal) {

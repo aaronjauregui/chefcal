@@ -63,7 +63,7 @@ func (c *Client) do(method, url string, body []byte, headers map[string]string) 
 // It is idempotent: an already-existing collection is treated as success.
 func (c *Client) EnsureCalendar(displayName string) error {
 	body := []byte(fmt.Sprintf(`<?xml version="1.0" encoding="utf-8"?>
-<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:caldav">
+<C:mkcalendar xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">
   <D:set><D:prop><D:displayname>%s</D:displayname></D:prop></D:set>
 </C:mkcalendar>`, xmlEscape(displayName)))
 
