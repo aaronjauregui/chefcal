@@ -3,3 +3,6 @@ config.yaml
 
 # build artifact
 /chefcal
+
+# logs
+cron.log
