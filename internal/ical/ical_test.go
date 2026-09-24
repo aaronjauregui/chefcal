@@ -21,9 +21,9 @@ func testPlanner(t *testing.T) *planner.Planner {
 
 type stubSource struct{}
 
-func (s *stubSource) ListMealPlans() ([]string, error)                    { return nil, nil }
-func (s *stubSource) ReadMealPlan(name string) (*model.MealPlan, error)   { return nil, nil }
-func (s *stubSource) ReadRecipe(name string) (*model.Recipe, error)       { return nil, nil }
+func (s *stubSource) ListMealPlans() ([]string, error)                  { return nil, nil }
+func (s *stubSource) ReadMealPlan(name string) (*model.MealPlan, error) { return nil, nil }
+func (s *stubSource) ReadRecipe(name string) (*model.Recipe, error)     { return nil, nil }
 
 func testWeek() *model.WeekPlan {
 	start := time.Date(2026, 4, 11, 0, 0, 0, 0, time.UTC) // Saturday
