@@ -45,7 +45,9 @@ func (s *Server) handleCalendar(w http.ResponseWriter, r *http.Request) {
 	cal := s.ical.Generate(weeks)
 	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Content-Disposition", "inline; filename=\"mealplan.ics\"")
-	fmt.Fprint(w, cal)
+	if _, err := fmt.Fprint(w, cal); err != nil {
+		log.Printf("Writing calendar response: %v", err)
+	}
 }
 
 func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
@@ -78,8 +80,7 @@ func (s *Server) handleGenerate(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Generated week starting %s with plan %q", weekStart.Format("2006-01-02"), planName)
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	writeJSON(w, map[string]any{
 		"week_start": weekStart.Format("2006-01-02"),
 		"plan":       planName,
 		"days":       formatDays(week),
@@ -92,8 +93,7 @@ func (s *Server) handlePlans(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("listing plans: %v", err), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(plans)
+	writeJSON(w, plans)
 }
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +106,18 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	plans, _ := s.nc.ListMealPlans()
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, renderIndex(weeks, plans, r.Host))
+	if _, err := fmt.Fprint(w, renderIndex(weeks, plans, r.Host)); err != nil {
+		log.Printf("Writing index response: %v", err)
+	}
+}
+
+// writeJSON encodes v as the JSON response body. Headers are already sent by
+// the time encoding fails, so errors can only be logged.
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		log.Printf("Writing JSON response: %v", err)
+	}
 }
 
 func formatDays(week *model.WeekPlan) []map[string]string {

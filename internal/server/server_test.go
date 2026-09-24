@@ -248,7 +248,9 @@ func TestHandleGenerate_SkipsExistingWeek(t *testing.T) {
 		t.Fatalf("first generate: %d", w.Code)
 	}
 	var resp1 map[string]any
-	json.Unmarshal(w.Body.Bytes(), &resp1)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp1); err != nil {
+		t.Fatalf("decoding response 1: %v", err)
+	}
 
 	// Generate second week — should be a different week
 	req = httptest.NewRequest("POST", "/generate?plan=TestPlan", nil)
@@ -258,7 +260,9 @@ func TestHandleGenerate_SkipsExistingWeek(t *testing.T) {
 		t.Fatalf("second generate: %d", w.Code)
 	}
 	var resp2 map[string]any
-	json.Unmarshal(w.Body.Bytes(), &resp2)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp2); err != nil {
+		t.Fatalf("decoding response 2: %v", err)
+	}
 
 	if resp1["week_start"] == resp2["week_start"] {
 		t.Error("second generate should target a different week")
