@@ -1,12 +1,34 @@
 # ChefCal
 
+[![CI](https://github.com/aaronjauregui/chefcal/actions/workflows/ci.yml/badge.svg)](https://github.com/aaronjauregui/chefcal/actions/workflows/ci.yml)
+[![Go version](https://img.shields.io/github/go-mod/go-version/aaronjauregui/chefcal)](go.mod)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A Go web service that generates weekly meal plans from recipes stored in Nextcloud and serves them as an iCal calendar feed. Subscribe to the feed from Nextcloud (or any calendar app) to see your dinner schedule and shopping list.
+
+## Features
+
+- **Nextcloud Cookbook integration.** Reads recipes over WebDAV (read-only) using the Cookbook app's standard layout.
+- **Themed meal plans.** Plain Markdown files define the pool of recipes to pick from.
+- **Timed dinner events.** Each event starts early enough for the recipe's total time to finish by your target dinner time.
+- **Weekly shopping list.** One calendar event aggregates every ingredient for the week.
+- **Standard iCal feed.** Works with Nextcloud Calendar, Google Calendar, Apple Calendar, Thunderbird, and others.
+- **Minimal footprint.** A single Go binary with two direct dependencies and a JSON file for storage, plus a small Docker image.
 
 ## How It Works
 
+```mermaid
+flowchart LR
+    NC[(Nextcloud<br/>WebDAV)] -->|meal plans + recipes| P[Planner]
+    UI[Web UI / API] -->|POST /generate| P
+    P -->|week plan| S[(JSON store)]
+    S --> G[iCal generator]
+    G -->|GET /calendar.ics| C[Calendar app]
+```
+
 1. ChefCal connects to your Nextcloud instance via WebDAV (read-only)
 2. It reads meal plan files (`.md`) that list recipe names, and recipe data (`recipe.json`) from your Nextcloud directories
-3. When you generate a week, it randomly picks 7 recipes from the chosen meal plan and assigns one per day (Monday–Sunday)
+3. When you generate a week, it randomly picks 7 distinct recipes from the chosen meal plan and assigns one per day (Saturday–Friday)
 4. Each dinner event is timed so that cooking finishes by 18:30 (configurable), with the start time calculated from the recipe's total prep/cook time
 5. A shopping list event is created on Saturday at noon (configurable) containing all aggregated ingredients for the week
 6. The calendar is served as a standard `.ics` feed that any calendar app can subscribe to
@@ -39,7 +61,7 @@ French Onion Soup
 Oyakodon
 ```
 
-The recipe names must match directory names under `/Recipes/`.
+The recipe names must match directory names under `/Recipes/`. A meal plan needs at least 7 valid recipes to fill a week.
 
 ### Recipe Files
 
@@ -167,11 +189,11 @@ The response includes the week start date, chosen plan, and daily meals:
 
 ```json
 {
-  "week_start": "2026-04-13",
+  "week_start": "2026-04-11",
   "plan": "Japanese Chicken",
   "days": [
-    {"date": "Monday, Apr 13", "recipe": "Oyakodon"},
-    {"date": "Tuesday, Apr 14", "recipe": "Karaage"}
+    {"date": "Saturday, Apr 11", "recipe": "Oyakodon"},
+    {"date": "Sunday, Apr 12", "recipe": "Karaage"}
   ]
 }
 ```
@@ -181,3 +203,38 @@ If next week already has a plan, the service automatically targets the week afte
 ## Data Persistence
 
 Generated week plans are stored in a JSON file (configured via `store.path`). Past weeks are automatically cleaned up — only current and upcoming weeks are kept.
+
+## Development
+
+The `Makefile` wraps the common tasks:
+
+| Command | Description |
+|---------|-------------|
+| `make build` | Build the `chefcal` binary |
+| `make run` | Build and run with `config.yaml` |
+| `make test` | Run all tests with the race detector |
+| `make test-cover` | Run tests and print per-function coverage |
+| `make lint` | Run `go vet`, a `gofmt` check, and [`golangci-lint`](https://golangci-lint.run/) |
+| `make fmt` | Format all Go files in place |
+| `make docker` | Build the Docker image |
+
+CI runs the build, formatting and `go mod tidy` checks, vet, tests, lint, and a Docker build on every push and pull request.
+
+### Project Layout
+
+```
+.
+├── main.go               # Entry point: loads config and wires up components
+└── internal/
+    ├── config/           # YAML config loading and defaults
+    ├── model/            # Shared domain types and the RecipeSource interface
+    ├── nextcloud/        # WebDAV client for reading meal plans and recipes
+    ├── planner/          # Week generation, dinner timing, ISO 8601 durations
+    ├── ical/             # RFC 5545 calendar feed generation
+    ├── store/            # JSON-file persistence with atomic writes
+    └── server/           # HTTP handlers and the web UI
+```
+
+## License
+
+[MIT](LICENSE)
