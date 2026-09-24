@@ -1,2 +1,7 @@
-data
+# Build output
+/chefcal
+coverage.out
+
+# Local configuration and runtime data
 config.yaml
+data/

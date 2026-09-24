@@ -1,0 +1,11 @@
+version: "2"
+
+linters:
+  enable:
+    - bodyclose
+    - misspell
+    - unconvert
+
+formatters:
+  enable:
+    - gofmt
