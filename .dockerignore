@@ -1,0 +1,13 @@
+# secrets and runtime state (mounted at runtime, never baked in)
+config.yaml
+data
+
+# build artifact
+chefcal
+
+# logs
+cron.log
+
+# repo metadata
+.git
+.github
