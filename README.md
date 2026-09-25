@@ -6,9 +6,9 @@ A Go web service that generates weekly meal plans from recipes stored in Nextclo
 
 1. ChefCal connects to your Nextcloud instance via WebDAV (read-only)
 2. It reads meal plan files (`.md`) that list recipe names, and recipe data (`recipe.json`) from your Nextcloud directories
-3. When you generate a week, it randomly picks 7 recipes from the chosen meal plan and assigns one per day (Monday–Sunday)
+3. When you generate a week, it randomly picks 7 distinct recipes from the chosen meal plan and assigns one per day. Weeks run Saturday–Friday, and the next week to plan starts on the coming Saturday
 4. Each dinner event is timed so that cooking finishes by 18:30 (configurable), with the start time calculated from the recipe's total prep/cook time
-5. A shopping list event is created on Saturday at noon (configurable). Ingredients are deduplicated across recipes — quantities in compatible units are summed (e.g. `200g chicken` + `300g chicken` → `500g chicken`) — and presented as a consolidated list, with a per-recipe breakdown kept below for reference
+5. A shopping list event is created at noon on the configured shopping day (Saturday by default, the first day of the week). Ingredients are deduplicated across recipes — quantities in compatible units are summed (e.g. `200g chicken` + `300g chicken` → `500g chicken`) — and presented as a consolidated list, with a per-recipe breakdown kept below for reference
 6. The calendar is served as a standard `.ics` feed that any calendar app can subscribe to
 
 ChefCal supports two delivery models:
@@ -44,7 +44,7 @@ French Onion Soup
 Oyakodon
 ```
 
-The recipe names must match directory names under `/Recipes/`.
+The recipe names must match directory names under `/Recipes/` (case-insensitively). Recipes that can't be read are skipped with a warning; a meal plan needs at least 7 readable recipes to generate a week.
 
 ### Recipe Files
 
@@ -101,6 +101,8 @@ Or run directly:
 go run . -config config.yaml
 ```
 
+A `Makefile` wraps the common tasks: `make build`, `make test`, `make test-cover`, `make lint` (vet + gofmt), `make docker`, and `make run`.
+
 ### Docker
 
 ```bash
@@ -108,9 +110,15 @@ docker build -t chefcal .
 docker run -p 8080:8080 -v ./config.yaml:/config.yaml -v ./data:/data chefcal
 ```
 
+With the default `store.path` of `data/weeks.json`, the store lands in the mounted `/data` volume. For push mode, override the command to pass the action flags:
+
+```bash
+docker run --rm -v ./config.yaml:/config.yaml -v ./data:/data chefcal -config /config.yaml -generate -push
+```
+
 ### Configuration
 
-Copy `config.yaml.example` and edit it:
+Copy `config.yaml.example` and edit it (the example file also documents `pantry_staples` in detail):
 
 ```yaml
 server:
@@ -132,6 +140,8 @@ planner:
   shopping_event_time: "12:00"
   shopping_event_day: "Saturday"
   timezone: "Australia/Sydney"
+  measurement_system: "us"
+  # pantry_staples: [water, ice, salt, soy sauce]
 
 store:
   path: "data/weeks.json"
@@ -153,6 +163,7 @@ store:
 | `planner.shopping_event_day` | Day of week for the shopping list event | `Saturday` |
 | `planner.timezone` | IANA timezone for calendar events | `Australia/Sydney` |
 | `planner.measurement_system` | `us` or `japanese`; sizes cup/tbsp/tsp when summing the shopping list | `us` |
+| `planner.pantry_staples` | Ingredient names left off the consolidated shopping list (see [Shopping List Deduplication](#shopping-list-deduplication)) | `[water, ice]` |
 | `store.path` | Path to the JSON file storing generated weeks | `data/weeks.json` |
 
 ## API Endpoints
@@ -162,7 +173,7 @@ store:
 | `GET` | `/` | Web UI for viewing current plans and generating new ones |
 | `GET` | `/calendar.ics` | iCal feed — subscribe to this from Nextcloud or any calendar app |
 | `GET` | `/plans` | JSON array of available meal plan names |
-| `POST` | `/generate?plan=Name` | Generate a meal plan for the next available week. Omit `plan` to pick a random meal plan file |
+| `POST` | `/generate?plan=Name` | Generate a meal plan for the next unplanned week. Omit `plan` to pick a random meal plan file |
 
 ### Subscribing in Nextcloud
 
@@ -171,7 +182,7 @@ store:
 3. Click "New subscription from link (read-only)"
 4. Enter `http://<chefcal-host>:8080/calendar.ics`
 
-The calendar will show dinner events for each day of the generated week(s) and a shopping list event on Saturday.
+The calendar will show dinner events for each day of the generated week(s) and a shopping list event on the configured shopping day.
 
 ### Generating a Week
 
@@ -191,16 +202,16 @@ The response includes the week start date, chosen plan, and daily meals:
 
 ```json
 {
-  "week_start": "2026-04-13",
+  "week_start": "2026-04-11",
   "plan": "Japanese Chicken",
   "days": [
-    {"date": "Monday, Apr 13", "recipe": "Oyakodon"},
-    {"date": "Tuesday, Apr 14", "recipe": "Karaage"}
+    {"date": "Saturday, Apr 11", "recipe": "Oyakodon"},
+    {"date": "Sunday, Apr 12", "recipe": "Karaage"}
   ]
 }
 ```
 
-If next week already has a plan, the service automatically targets the week after.
+Weeks start on Saturday. If next week already has a plan, the service automatically targets the week after.
 
 ## Command-Line Flags
 
@@ -212,7 +223,7 @@ Run with no action flags to start the HTTP server (pull mode). Passing `-generat
 | `-generate` | Generate the next unplanned week, save it to the store, and exit |
 | `-regenerate` | Re-roll the earliest upcoming planned week in place (new recipes), and exit |
 | `-plan <name>` | Meal plan for `-generate`/`-regenerate` (random for generate, the week's current plan for regenerate, if omitted) |
-| `-week <YYYY-MM-DD>` | Target week start for `-generate` (overwrites any plan for that week); default is the next unplanned week. Use to back-date and fill the current week |
+| `-week <YYYY-MM-DD>` | Target week start for `-generate` (overwrites any plan for that week); default is the next unplanned week. Should be a Saturday, since weeks run Saturday–Friday. Use to back-date and fill the current week |
 | `-push` | Reconcile the stored plans onto the Nextcloud calendar and exit |
 
 These actions can be combined in one invocation and run in order generate → regenerate → push, so e.g. `chefcal -regenerate -push` re-rolls this week and republishes it. Because push resource UIDs are keyed by date, the re-rolled events update in place rather than duplicating. `-regenerate` reuses the week's existing meal plan unless `-plan` overrides it.
@@ -246,9 +257,11 @@ Give ChefCal a **dedicated** calendar. It treats the collection as exclusively i
 A typical cron setup — a new week each Saturday morning, plus a nightly reconcile so edits and retractions stay in sync:
 
 ```cron
-0 6 * * SAT   cd /opt/chefcal && ./chefcal -generate -push
-0 3 * * *     cd /opt/chefcal && ./chefcal -push
+0 6 * * SAT   cd /opt/chefcal && ./chefcal -generate -push >> cron.log 2>&1
+0 3 * * *     cd /opt/chefcal && ./chefcal -push >> cron.log 2>&1
 ```
+
+Running `-generate` on a Saturday plans the week starting the *following* Saturday, so there's always a week of lead time for shopping. To fill the current week instead, pass `-week` with this week's Saturday.
 
 ### How reconciliation works
 
