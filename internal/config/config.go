@@ -19,12 +19,14 @@ type ServerConfig struct {
 }
 
 type NextcloudConfig struct {
-	URL                string `yaml:"url"`
-	Username           string `yaml:"username"`
-	Password           string `yaml:"password"`
-	MealPlansPath      string `yaml:"meal_plans_path"`
-	RecipesPath        string `yaml:"recipes_path"`
-	InsecureSkipVerify bool   `yaml:"insecure_skip_verify"`
+	URL                 string `yaml:"url"`
+	Username            string `yaml:"username"`
+	Password            string `yaml:"password"`
+	MealPlansPath       string `yaml:"meal_plans_path"`
+	RecipesPath         string `yaml:"recipes_path"`
+	InsecureSkipVerify  bool   `yaml:"insecure_skip_verify"`
+	CalendarURL         string `yaml:"calendar_url"`          // CalDAV collection URL for -push
+	CalendarDisplayName string `yaml:"calendar_display_name"` // name used when creating the calendar
 }
 
 type PlannerConfig struct {
@@ -32,6 +34,12 @@ type PlannerConfig struct {
 	ShoppingEventTime string `yaml:"shopping_event_time"`
 	ShoppingEventDay  string `yaml:"shopping_event_day"`
 	Timezone          string `yaml:"timezone"`
+	MeasurementSystem string `yaml:"measurement_system"` // "us" (default) or "japanese"; sizes cup/tbsp/tsp
+
+	// PantryStaples are ingredient names to omit from the consolidated shopping
+	// list (they still appear in the per-recipe breakdown). Unset falls back to
+	// a built-in default; an explicit empty list disables exclusion.
+	PantryStaples []string `yaml:"pantry_staples"`
 }
 
 type StoreConfig struct {
@@ -51,8 +59,12 @@ func Load(path string) (*Config, error) {
 			ShoppingEventTime: "12:00",
 			ShoppingEventDay:  "Saturday",
 			Timezone:          "Australia/Sydney",
+			MeasurementSystem: "us",
 		},
 		Store: StoreConfig{Path: "data/weeks.json"},
+		Nextcloud: NextcloudConfig{
+			CalendarDisplayName: "Meal Plan",
+		},
 	}
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {

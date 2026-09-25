@@ -12,19 +12,19 @@ type RecipeSource interface {
 }
 
 type Recipe struct {
-	ID                 string      `json:"id"`
-	Name               string      `json:"name"`
-	Description        string      `json:"description"`
-	URL                string      `json:"url"`
-	Image              string      `json:"image"`
-	PrepTime           string      `json:"prepTime"`
-	CookTime           string      `json:"cookTime"`
-	TotalTime          string      `json:"totalTime"`
-	RecipeCategory     string      `json:"recipeCategory"`
-	Keywords           string      `json:"keywords"`
-	RecipeYield        int         `json:"recipeYield"`
-	RecipeIngredient   []string    `json:"recipeIngredient"`
-	RecipeInstructions []string    `json:"recipeInstructions"`
+	ID                 string   `json:"id"`
+	Name               string   `json:"name"`
+	Description        string   `json:"description"`
+	URL                string   `json:"url"`
+	Image              string   `json:"image"`
+	PrepTime           string   `json:"prepTime"`
+	CookTime           string   `json:"cookTime"`
+	TotalTime          string   `json:"totalTime"`
+	RecipeCategory     string   `json:"recipeCategory"`
+	Keywords           string   `json:"keywords"`
+	RecipeYield        int      `json:"recipeYield"`
+	RecipeIngredient   []string `json:"recipeIngredient"`
+	RecipeInstructions []string `json:"recipeInstructions"`
 }
 
 type MealPlan struct {
@@ -41,6 +41,6 @@ type DayMeal struct {
 type WeekPlan struct {
 	WeekStart    time.Time `json:"week_start"` // Saturday
 	MealPlanName string    `json:"meal_plan_name"`
-	Days         []DayMeal `json:"days"`       // 7 days, Sat-Fri
+	Days         []DayMeal `json:"days"` // 7 days, Sat-Fri
 	GeneratedAt  time.Time `json:"generated_at"`
 }

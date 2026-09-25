@@ -70,6 +70,22 @@ func (s *Store) GetCurrentWeeks() []*model.WeekPlan {
 	return result
 }
 
+// EarliestCurrentWeek returns the soonest week that has not fully passed,
+// reporting false if no such week is stored.
+func (s *Store) EarliestCurrentWeek() (*model.WeekPlan, bool) {
+	weeks := s.GetCurrentWeeks()
+	if len(weeks) == 0 {
+		return nil, false
+	}
+	earliest := weeks[0]
+	for _, w := range weeks[1:] {
+		if w.WeekStart.Before(earliest.WeekStart) {
+			earliest = w
+		}
+	}
+	return earliest, true
+}
+
 func (s *Store) HasWeek(weekStart time.Time) bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

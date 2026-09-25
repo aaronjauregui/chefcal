@@ -9,12 +9,33 @@ nextcloud:
   meal_plans_path: "/Meal Plans"
   recipes_path: "/Recipes"
   insecure_skip_verify: false  # set to true for self-signed certificates
+  # Required only for the push model (`chefcal -push`). CalDAV collection URL
+  # for a calendar ChefCal owns; it will be created on first push if missing.
+  calendar_url: "https://your-nextcloud.example.com/remote.php/dav/calendars/username/chefcal"
+  calendar_display_name: "Meal Plan"
 
 planner:
   dinner_done_by: "18:30"
   shopping_event_time: "12:00"
   shopping_event_day: "Saturday"
   timezone: "Australia/Sydney"
+  measurement_system: "us"  # "us" or "japanese"; sizes cup/tbsp/tsp for the shopping list
+  # Ingredient names omitted from the consolidated shopping list (they still
+  # appear in the per-recipe breakdown). Unset uses a built-in default of
+  # [water, ice]; an explicit empty list disables exclusion. Single-word names
+  # match the whole ingredient exactly ("water" won't drop "coconut water");
+  # multi-word names match as a phrase ("soy sauce" also drops "light soy sauce").
+  # pantry_staples:
+  #   - water
+  #   - ice
+  #   - salt
+  #   - black pepper
+  #   - soy sauce
+  #   - mirin
+  #   - sake
+  #   - sesame oil
+  #   - sugar
+  #   - oil
 
 store:
   path: "data/weeks.json"
