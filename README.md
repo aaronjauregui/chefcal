@@ -175,6 +175,9 @@ store:
 | `GET` | `/plans` | JSON array of available meal plan names |
 | `POST` | `/generate?plan=Name` | Generate a meal plan for the next unplanned week. Omit `plan` to pick a random meal plan file |
 
+> [!WARNING]
+> The HTTP server has no authentication. Anyone who can reach it can read your meal plans and generate new weeks. Run it only on a trusted network, and don't expose it to the internet. If you don't need the web UI, [push mode](#push-mode) avoids running a server at all.
+
 ### Subscribing in Nextcloud
 
 1. Start ChefCal on your network
